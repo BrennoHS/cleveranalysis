@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AdOps Report Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-dark:     #0f1117;
+      --bg-darker:   #060b11;
+      --bg-light:    #1a2332;
+      --border-col:  #21262d;
+      --border-light:#30363d;
+      --text-main:   #e6edf3;
+      --text-muted:  #8b949e;
+      --accent-blue: #58a6ff;
+      --accent-green:#3fb950;
+      --accent-red:  #f85149;
+      --accent-yellow:#d29922;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ─ HEADER ─ */
+    header {
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border-col);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ─ MAIN LAYOUT ─ */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    /* ─ CONTAINER & SECTIONS ─ */
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    /* ─ INPUT SECTION ─ */
+    .input-section {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-light);
+      border: 1px solid var(--border-col);
+      border-radius: 8px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* ─ FORM ELEMENTS ─ */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    textarea, input[type="text"] {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-light);
+      color: var(--text-main);
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      padding: 12px;
+      border-radius: 6px;
+      outline: none;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 200px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    input[type="text"] {
+      height: 40px;
+    }
+
+    textarea::placeholder, input::placeholder {
+      color: var(--text-muted);
+    }
+
+    textarea:focus, input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+    }
+
+    /* ─ BUTTON ─ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 20px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: var(--bg-dark);
+      width: 100%;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #79c0ff;
+      box-shadow: 0 8px 24px rgba(88, 166, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ─ LOADING STATE ─ */
+    .loading-state {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px;
+    }
+
+    .loading-state.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(88, 166, 255, 0.2);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner + span {
+      font-size: 13px;
+      color: var(--accent-blue);
+    }
+
+    /* ─ ERROR MESSAGE ─ */
+    .error-message {
+      display: none;
+      background: rgba(248, 81, 73, 0.08);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 6px;
+      padding: 12px 16px;
+      color: var(--accent-red);
+      font-size: 12px;
+      line-height: 1.6;
+      animation: slideDown 0.3s ease;
+    }
+
+    .error-message.visible {
+      display: block;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─ RESULTS SECTION ─ */
+    #results-container {
+      display: none;
+    }
+
+    #results-container.visible {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* ─ RESULTS HEADER ─ */
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .results-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .results-period {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .results-publisher {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ─ STATUS BADGE ─ */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-normal {
+      background: rgba(63, 185, 80, 0.1);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+      color: var(--accent-green);
+    }
+
+    .status-normal::before {
+      background: var(--accent-green);
+    }
+
+    .status-warning {
+      background: rgba(210, 153, 34, 0.1);
+      border: 1px solid rgba(210, 153, 34, 0.3);
+      color: var(--accent-yellow);
+    }
+
+    .status-warning::before {
+      background: var(--accent-yellow);
+    }
+
+    .status-alert {
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      color: var(--accent-red);
+    }
+
+    .status-alert::before {
+      background: var(--accent-red);
+    }
+
+    /* ─ COMPARISON TABLE ─ */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+
+    thead {
+      border-bottom: 2px solid var(--border-light);
+    }
+
+    th {
+      padding: 12px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--bg-dark);
+    }
+
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid var(--border-col);
+      font-size: 13px;
+    }
+
+    td:first-child {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    td:not(:first-child) {
+      text-align: right;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    tbody tr:hover {
+      background: rgba(88, 166, 255, 0.05);
+    }
+
+    /* ─ DISCREPANCY SECTION ─ */
+    .discrepancy-section {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 24px;
+      background: var(--bg-light);
+      border: 1px solid var(--border-col);
+      border-radius: 8px;
+    }
+
+    @media (max-width: 800px) {
+      .discrepancy-section { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 500px) {
+      .discrepancy-section { grid-template-columns: 1fr; }
+    }
+
+    .disc-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .disc-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .disc-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .disc-value.positive { color: var(--accent-green); }
+    .disc-value.negative { color: var(--accent-yellow); }
+    .disc-value.high { color: var(--accent-red); }
+
+    /* ─ AI EXPLANATION ─ */
+    .explanation {
+      background: var(--bg-light);
+      border: 1px solid var(--border-col);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .explanation h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 16px;
+    }
+
+    .explanation-text {
+      font-size: 13px;
+      color: var(--text-main);
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    /* ─ FOOTER ─ */
+    footer {
+      text-align: center;
+      padding: 32px;
+      border-top: 1px solid var(--border-col);
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 40px;
+    }
+
+    /* ─ UTILITY ─ */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📊 AdOps Report Analyzer</h1>
+    <p>Compare publisher metrics against Elasticsearch data instantly</p>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- INPUT SECTION -->
+      <div class="input-section">
+        <div class="card">
+          <h2>📋 Publisher Report</h2>
+          <p>Cole o relatório gerado pelo publisher. Pode ser texto livre, CSV ou qualquer formato.</p>
+          <div class="form-group">
+            <textarea
+              id="report-text"
+              placeholder="Cole aqui o relatório do publisher..."></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>⚙️ Configuração (Opcional)</h2>
+          <div class="form-group">
+            <label>Publisher / Domain</label>
+            <input type="text" id="publisher" placeholder="Ex: example.com" />
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-analyze">
+          ▶ Analisar Report
+        </button>
+
+        <div class="loading-state" id="loading">
+          <div class="spinner"></div>
+          <span>Processando...</span>
+        </div>
+
+        <div class="error-message" id="error-msg"></div>
+      </div>
+
+      <!-- EMPTY STATE / PLACEHOLDER -->
+      <div id="empty-state" style="padding: 40px 24px; text-align: center; opacity: 0.6;">
+        <p style="font-size: 48px; margin-bottom: 16px;">🔍</p>
+        <p style="color: var(--text-muted); font-size: 13px;">
+          Aguardando análise...<br>
+          Cole um relatório e clique em "Analisar Report"
+        </p>
+      </div>
+
+      <!-- RESULTS SECTION -->
+      <div id="results-container">
+        <!-- Status Header -->
+        <div class="results-header">
+          <div class="results-info">
+            <div class="results-period" id="res-period">—</div>
+            <div class="results-publisher" id="res-publisher">—</div>
+          </div>
+          <div class="status-badge" id="res-badge" class="status-normal">
+            Normal
+          </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Métrica</th>
+                <th>Publisher</th>
+                <th>Elasticsearch</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Served Impressions</td>
+                <td id="res-pub-served">—</td>
+                <td id="res-clever-served">—</td>
+              </tr>
+              <tr>
+                <td>Viewable Impressions</td>
+                <td id="res-pub-viewable">—</td>
+                <td id="res-clever-viewable">—</td>
+              </tr>
+              <tr>
+                <td>Viewability Rate</td>
+                <td id="res-pub-viewability">—</td>
+                <td id="res-clever-viewability">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Discrepancy Summary -->
+        <div class="discrepancy-section">
+          <div class="disc-item">
+            <div class="disc-label">Δ Served Impressions</div>
+            <div class="disc-value" id="res-diff-served">—</div>
+          </div>
+          <div class="disc-item">
+            <div class="disc-label">Δ Viewable Impressions</div>
+            <div class="disc-value" id="res-diff-viewable">—</div>
+          </div>
+          <div class="disc-item">
+            <div class="disc-label">Viewability Gap (pp)</div>
+            <div class="disc-value" id="res-gap-pp">—</div>
+          </div>
+          <div class="disc-item">
+            <div class="disc-label">Diff Relativo (%)</div>
+            <div class="disc-value" id="res-diff-pct">—</div>
+          </div>
+        </div>
+
+        <!-- AI Explanation -->
+        <div class="explanation">
+          <h3>🤖 Análise da IA</h3>
+          <div class="explanation-text" id="res-explanation">—</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    AdOps Report Analyzer • Powered by Gemini AI + Elasticsearch
+  </footer>
+
+  <script>
+    const API_BASE = 'http://localhost:8000';
+
+    function fmt(n) {
+      if (n == null || n === '—') return '—';
+      return Number(n).toLocaleString('en-US');
+    }
+
+    function fmtPct(n) {
+      if (n == null || n === '—') return '—';
+      return `${Number(n).toFixed(1)}%`;
+    }
+
+    function formatGap(pp) {
+      if (pp == null || pp === '—') return '—';
+      const sign = pp >= 0 ? '+' : '';
+      return `${sign}${Number(pp).toFixed(2)} pp`;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').classList.remove('visible');
+    }
+
+    function setStatus(status) {
+      const badge = document.getElementById('res-badge');
+      badge.textContent = status;
+      badge.className = 'status-badge';
+
+      if (status === 'Normal') {
+        badge.classList.add('status-normal');
+      } else if (status === 'Attention') {
+        badge.classList.add('status-warning');
+      } else {
+        badge.classList.add('status-alert');
+      }
+    }
+
+    function getDiscrepancyClass(pp) {
+      const abs = Math.abs(pp);
+      if (abs < 10) return 'positive';
+      if (abs <= 25) return 'negative';
+      return 'high';
+    }
+
+    function renderResults(data) {
+      // Header info
+      document.getElementById('res-period').textContent =
+        `${data.start_date} → ${data.end_date}`;
+      document.getElementById('res-publisher').textContent =
+        `Publisher: ${data.publisher}`;
+
+      setStatus(data.status);
+
+      // Table
+      document.getElementById('res-pub-served').textContent = fmt(data.pub_served);
+      document.getElementById('res-clever-served').textContent = fmt(data.clever_served);
+      document.getElementById('res-pub-viewable').textContent = fmt(data.pub_viewable);
+      document.getElementById('res-clever-viewable').textContent = fmt(data.clever_viewable);
+      document.getElementById('res-pub-viewability').textContent = fmtPct(data.pub_viewability_pct);
+      document.getElementById('res-clever-viewability').textContent = fmtPct(data.clever_viewability_pct);
+
+      // Discrepancy
+      const diffServedEl = document.getElementById('res-diff-served');
+      diffServedEl.textContent = fmt(data.diff_served);
+
+      const diffViewableEl = document.getElementById('res-diff-viewable');
+      diffViewableEl.textContent = fmt(data.diff_viewable);
+
+      const gapEl = document.getElementById('res-gap-pp');
+      gapEl.textContent = formatGap(data.viewability_diff_pp);
+      gapEl.className = 'disc-value ' + getDiscrepancyClass(data.viewability_diff_pp);
+
+      const pctEl = document.getElementById('res-diff-pct');
+      const pctValue = data.viewability_diff_pct || 0;
+      const sign = pctValue >= 0 ? '+' : '';
+      pctEl.textContent = `${sign}${Number(pctValue).toFixed(1)}%`;
+      pctEl.className = 'disc-value ' + getDiscrepancyClass(data.viewability_diff_pp);
+
+      // Explanation
+      document.getElementById('res-explanation').textContent = data.explanation;
+
+      // Show results
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('results-container').classList.add('visible');
+    }
+
+    async function runAnalysis() {
+      const reportText = document.getElementById('report-text').value.trim();
+      const publisher = document.getElementById('publisher').value.trim();
+
+      if (!reportText) {
+        showError('⚠️ Cole um relatório antes de analisar.');
+        return;
+      }
+
+      hideError();
+
+      const btn = document.getElementById('btn-analyze');
+      btn.disabled = true;
+      document.getElementById('loading').classList.add('active');
+
+      try {
+        const response = await fetch(`${API_BASE}/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            report_text: reportText,
+            publisher: publisher || null,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const detail = data.detail || `Erro HTTP ${response.status}`;
+          throw new Error(detail);
+        }
+
+        renderResults(data);
+
+      } catch (err) {
+        showError(`❌ Falha na análise: ${err.message}`);
+        document.getElementById('empty-state').classList.remove('hidden');
+        document.getElementById('results-container').classList.remove('visible');
+      } finally {
+        document.getElementById('loading').classList.remove('active');
+        btn.disabled = false;
+      }
+    }
+
+    // Botão click handler
+    document.getElementById('btn-analyze').addEventListener('click', runAnalysis);
+
+    // Ctrl+Enter para submeter
+    document.getElementById('report-text').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        runAnalysis();
+      }
+    });
+  </script>
+
+</body>
+</html>

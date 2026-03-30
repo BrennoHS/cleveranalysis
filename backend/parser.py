@@ -8,9 +8,12 @@ import re
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
+PARSER_MODEL = os.environ.get("GEMINI_PARSER_MODEL", "gemini-flash-lite-latest")
+PARSER_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_PARSER_MAX_OUTPUT_TOKENS", "256"))
 
 
 EXTRACTION_PROMPT = """
@@ -40,12 +43,34 @@ Return ONLY this JSON (nothing else):
 """
 
 
+def _fallback_extract_from_text(report_text: str) -> dict:
+    """Best-effort extraction if model output is malformed."""
+    text = report_text or ""
+
+    # Extract first two large numeric values as served/viewable fallback.
+    nums = re.findall(r"\b\d{3,}\b", text)
+    served = int(nums[0]) if len(nums) >= 1 else None
+    viewable = int(nums[1]) if len(nums) >= 2 else None
+
+    # Extract dates in YYYY-MM-DD format.
+    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", text)
+    start_date = dates[0] if len(dates) >= 1 else None
+    end_date = dates[1] if len(dates) >= 2 else None
+
+    return {
+        "served_impressions": served,
+        "viewable_impressions": viewable,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
 def parse_publisher_report(report_text: str) -> dict:
     """
     Sends the raw publisher report to Gemini and returns extracted metrics.
     Returns a dict with keys: served_impressions, viewable_impressions, start_date, end_date.
     """
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel(PARSER_MODEL)
 
     prompt = EXTRACTION_PROMPT.format(report_text=report_text.strip())
 
@@ -53,7 +78,7 @@ def parse_publisher_report(report_text: str) -> dict:
         prompt,
         generation_config=genai.types.GenerationConfig(
             temperature=0.0,
-            max_output_tokens=512,
+            max_output_tokens=PARSER_MAX_OUTPUT_TOKENS,
         ),
     )
 
@@ -73,6 +98,9 @@ def parse_publisher_report(report_text: str) -> dict:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as e:
+        fallback = _fallback_extract_from_text(report_text)
+        if fallback.get("served_impressions") and fallback.get("start_date") and fallback.get("end_date"):
+            return fallback
         # More helpful error message
         raise ValueError(f"Failed to parse JSON from Gemini response: {str(e)}\nRaw response: {raw[:200]}")
 

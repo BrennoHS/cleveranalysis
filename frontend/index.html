@@ -10,23 +10,29 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg-dark:     #0f1117;
-      --bg-darker:   #060b11;
-      --bg-light:    #1a2332;
-      --border-col:  #21262d;
-      --border-light:#30363d;
-      --text-main:   #e6edf3;
-      --text-muted:  #8b949e;
-      --accent-blue: #58a6ff;
-      --accent-green:#3fb950;
-      --accent-red:  #f85149;
-      --accent-yellow:#d29922;
+      --bg-dark:      #0b0f14;
+      --bg-darker:    #070a0f;
+      --bg-light:     #141b24;
+      --bg-panel:     rgba(20, 27, 36, 0.68);
+      --bg-panel-2:   rgba(17, 23, 31, 0.78);
+      --border-col:   rgba(148, 163, 184, 0.16);
+      --border-light: rgba(148, 163, 184, 0.22);
+      --text-main:    #e2e8f0;
+      --text-muted:   #94a3b8;
+      --accent-blue:  #7c8fa3;
+      --accent-green: #6ee7b7;
+      --accent-red:   #fca5a5;
+      --accent-yellow:#fcd34d;
+      --shadow-soft:  0 14px 40px rgba(0, 0, 0, 0.28);
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--bg-dark);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(124, 143, 163, 0.14), transparent 55%),
+        radial-gradient(900px 500px at 90% 0%, rgba(148, 163, 184, 0.08), transparent 50%),
+        var(--bg-dark);
       color: var(--text-main);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 14px;
@@ -36,8 +42,9 @@
 
     /* ─ HEADER ─ */
     header {
-      background: var(--bg-darker);
-      border-bottom: 1px solid var(--border-col);
+      background: rgba(7, 10, 15, 0.72);
+      border-bottom: 1px solid var(--border-light);
+      backdrop-filter: blur(10px);
       padding: 20px 32px;
       position: sticky;
       top: 0;
@@ -45,10 +52,10 @@
     }
 
     header h1 {
-      font-size: 18px;
-      font-weight: 600;
+      font-size: 20px;
+      font-weight: 700;
       color: var(--text-main);
-      letter-spacing: -0.5px;
+      letter-spacing: -0.3px;
     }
 
     header p {
@@ -61,7 +68,7 @@
     main {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 40px 32px;
+      padding: 44px 32px;
     }
 
     /* ─ CONTAINER & SECTIONS ─ */
@@ -84,20 +91,22 @@
     }
 
     .card {
-      background: var(--bg-light);
+      background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
       border: 1px solid var(--border-col);
-      border-radius: 8px;
+      border-radius: 14px;
       padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow-soft);
     }
 
     .card h2 {
-      font-size: 15px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 700;
       color: var(--text-main);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .card p {
@@ -122,13 +131,13 @@
     }
 
     textarea, input[type="text"] {
-      background: var(--bg-dark);
+      background: rgba(10, 14, 20, 0.9);
       border: 1px solid var(--border-light);
       color: var(--text-main);
       font-family: 'Monaco', 'Courier New', monospace;
       font-size: 12px;
       padding: 12px;
-      border-radius: 6px;
+      border-radius: 10px;
       outline: none;
       transition: all 0.2s;
       font-family: inherit;
@@ -150,7 +159,7 @@
 
     textarea:focus, input:focus {
       border-color: var(--accent-blue);
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(124, 143, 163, 0.2);
     }
 
     /* ─ BUTTON ─ */
@@ -166,21 +175,21 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border: none;
-      border-radius: 6px;
+      border-radius: 10px;
       cursor: pointer;
       transition: all 0.2s;
       white-space: nowrap;
     }
 
     .btn-primary {
-      background: var(--accent-blue);
-      color: var(--bg-dark);
+      background: linear-gradient(180deg, #8fa3b8, #6f8398);
+      color: #0b1119;
       width: 100%;
     }
 
     .btn-primary:hover:not(:disabled) {
-      background: #79c0ff;
-      box-shadow: 0 8px 24px rgba(88, 166, 255, 0.3);
+      background: linear-gradient(180deg, #9eb0c2, #7d90a4);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
       transform: translateY(-2px);
     }
 
@@ -205,7 +214,7 @@
     .spinner {
       width: 16px;
       height: 16px;
-      border: 2px solid rgba(88, 166, 255, 0.2);
+      border: 2px solid rgba(124, 143, 163, 0.25);
       border-top-color: var(--accent-blue);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
@@ -223,9 +232,9 @@
     /* ─ ERROR MESSAGE ─ */
     .error-message {
       display: none;
-      background: rgba(248, 81, 73, 0.08);
-      border: 1px solid rgba(248, 81, 73, 0.3);
-      border-radius: 6px;
+      background: rgba(252, 165, 165, 0.08);
+      border: 1px solid rgba(252, 165, 165, 0.28);
+      border-radius: 10px;
       padding: 12px 16px;
       color: var(--accent-red);
       font-size: 12px;
@@ -290,7 +299,7 @@
       align-items: center;
       gap: 8px;
       padding: 8px 16px;
-      border-radius: 6px;
+      border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
@@ -305,8 +314,8 @@
     }
 
     .status-normal {
-      background: rgba(63, 185, 80, 0.1);
-      border: 1px solid rgba(63, 185, 80, 0.3);
+      background: rgba(110, 231, 183, 0.1);
+      border: 1px solid rgba(110, 231, 183, 0.25);
       color: var(--accent-green);
     }
 
@@ -315,8 +324,8 @@
     }
 
     .status-warning {
-      background: rgba(210, 153, 34, 0.1);
-      border: 1px solid rgba(210, 153, 34, 0.3);
+      background: rgba(252, 211, 77, 0.1);
+      border: 1px solid rgba(252, 211, 77, 0.24);
       color: var(--accent-yellow);
     }
 
@@ -325,8 +334,8 @@
     }
 
     .status-alert {
-      background: rgba(248, 81, 73, 0.1);
-      border: 1px solid rgba(248, 81, 73, 0.3);
+      background: rgba(252, 165, 165, 0.1);
+      border: 1px solid rgba(252, 165, 165, 0.24);
       color: var(--accent-red);
     }
 
@@ -335,14 +344,28 @@
     }
 
     /* ─ COMPARISON TABLE ─ */
+    .table-with-side {
+      display: grid;
+      grid-template-columns: 2.3fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 980px) {
+      .table-with-side {
+        grid-template-columns: 1fr;
+      }
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 24px;
+      border-radius: 12px;
+      overflow: hidden;
     }
 
     thead {
-      border-bottom: 2px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
     }
 
     th {
@@ -353,7 +376,7 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      background: var(--bg-dark);
+      background: rgba(10, 14, 20, 0.72);
     }
 
     td {
@@ -374,7 +397,54 @@
     }
 
     tbody tr:hover {
-      background: rgba(88, 166, 255, 0.05);
+      background: rgba(124, 143, 163, 0.08);
+    }
+
+    /* ─ VIEWABILITY STYLING ─ */
+    td.viewability-low {
+      color: var(--accent-red) !important;
+    }
+
+    .viewability-side {
+      border: 1px solid var(--border-col);
+      border-radius: 12px;
+      background: rgba(10, 14, 20, 0.6);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .viewability-side-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .viewability-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--border-col);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(20, 27, 36, 0.5);
+    }
+
+    .viewability-item-label {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .viewability-item-value {
+      color: var(--text-main);
+      font-size: 15px;
+      font-weight: 700;
     }
 
     /* ─ DISCREPANCY SECTION ─ */
@@ -384,9 +454,11 @@
       gap: 16px;
       margin-bottom: 24px;
       padding: 24px;
-      background: var(--bg-light);
+      background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
       border: 1px solid var(--border-col);
-      border-radius: 8px;
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow-soft);
     }
 
     @media (max-width: 800px) {
@@ -423,11 +495,13 @@
 
     /* ─ AI EXPLANATION ─ */
     .explanation {
-      background: var(--bg-light);
+      background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
       border: 1px solid var(--border-col);
-      border-radius: 8px;
+      border-radius: 14px;
       padding: 24px;
       margin-bottom: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow-soft);
     }
 
     .explanation h3 {
@@ -449,7 +523,7 @@
     footer {
       text-align: center;
       padding: 32px;
-      border-top: 1px solid var(--border-col);
+      border-top: 1px solid var(--border-light);
       font-size: 12px;
       color: var(--text-muted);
       margin-top: 40px;
@@ -462,7 +536,7 @@
 <body>
 
   <header>
-    <h1>📊 AdOps Report Analyzer</h1>
+    <h1>AdOps Report Analyzer</h1>
     <p>Compare publisher metrics against Elasticsearch data instantly</p>
   </header>
 
@@ -471,7 +545,7 @@
       <!-- INPUT SECTION -->
       <div class="input-section">
         <div class="card">
-          <h2>📋 Publisher Report</h2>
+          <h2>Publisher Report</h2>
           <p>Cole o relatório gerado pelo publisher. Pode ser texto livre, CSV ou qualquer formato.</p>
           <div class="form-group">
             <textarea
@@ -481,7 +555,11 @@
         </div>
 
         <div class="card">
-          <h2>⚙️ Configuração (Opcional)</h2>
+          <h2>Configuração (Opcional)</h2>
+          <div class="form-group">
+            <label>Script ID (Kibana)</label>
+            <input type="text" id="script-id" placeholder="Ex: 100424" />
+          </div>
           <div class="form-group">
             <label>Publisher / Domain</label>
             <input type="text" id="publisher" placeholder="Ex: example.com" />
@@ -489,7 +567,7 @@
         </div>
 
         <button class="btn btn-primary" id="btn-analyze">
-          ▶ Analisar Report
+          Analisar Report
         </button>
 
         <div class="loading-state" id="loading">
@@ -502,7 +580,6 @@
 
       <!-- EMPTY STATE / PLACEHOLDER -->
       <div id="empty-state" style="padding: 40px 24px; text-align: center; opacity: 0.6;">
-        <p style="font-size: 48px; margin-bottom: 16px;">🔍</p>
         <p style="color: var(--text-muted); font-size: 13px;">
           Aguardando análise...<br>
           Cole um relatório e clique em "Analisar Report"
@@ -517,64 +594,78 @@
             <div class="results-period" id="res-period">—</div>
             <div class="results-publisher" id="res-publisher">—</div>
           </div>
-          <div class="status-badge" id="res-badge" class="status-normal">
+          <div class="status-badge" id="res-badge">
             Normal
           </div>
         </div>
 
         <!-- Comparison Table -->
         <div class="card">
-          <table>
-            <thead>
-              <tr>
-                <th>Métrica</th>
-                <th>Publisher</th>
-                <th>Elasticsearch</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Served Impressions</td>
-                <td id="res-pub-served">—</td>
-                <td id="res-clever-served">—</td>
-              </tr>
-              <tr>
-                <td>Viewable Impressions</td>
-                <td id="res-pub-viewable">—</td>
-                <td id="res-clever-viewable">—</td>
-              </tr>
-              <tr>
-                <td>Viewability Rate</td>
-                <td id="res-pub-viewability">—</td>
-                <td id="res-clever-viewability">—</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-with-side">
+            <table>
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Clever</th>
+                  <th>Publisher</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Served Impressions</td>
+                  <td id="res-clever-served">—</td>
+                  <td id="res-pub-served">—</td>
+                </tr>
+                <tr>
+                  <td>Viewable Impressions</td>
+                  <td id="res-clever-viewable">—</td>
+                  <td id="res-pub-viewable">—</td>
+                </tr>
+                <tr>
+                  <td>Garbage</td>
+                  <td id="res-clever-garbage">—</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <aside class="viewability-side">
+              <div class="viewability-side-title">Viewability (%)</div>
+              <div class="viewability-item">
+                <span class="viewability-item-label">Clever</span>
+                <span class="viewability-item-value" id="res-side-clever-viewability">—</span>
+              </div>
+              <div class="viewability-item">
+                <span class="viewability-item-label">Publisher</span>
+                <span class="viewability-item-value" id="res-side-pub-viewability">—</span>
+              </div>
+            </aside>
+          </div>
         </div>
 
         <!-- Discrepancy Summary -->
         <div class="discrepancy-section">
           <div class="disc-item">
-            <div class="disc-label">Δ Served Impressions</div>
+            <div class="disc-label">Discrepância Served (%)</div>
+            <div class="disc-value" id="res-disc-served-pct">—</div>
+          </div>
+          <div class="disc-item">
+            <div class="disc-label">Discrepância Viewable (%)</div>
+            <div class="disc-value" id="res-disc-viewable-pct">—</div>
+          </div>
+          <div class="disc-item">
+            <div class="disc-label">Δ Served (Clever - Publisher)</div>
             <div class="disc-value" id="res-diff-served">—</div>
           </div>
           <div class="disc-item">
-            <div class="disc-label">Δ Viewable Impressions</div>
+            <div class="disc-label">Δ Viewable (Clever - Publisher)</div>
             <div class="disc-value" id="res-diff-viewable">—</div>
-          </div>
-          <div class="disc-item">
-            <div class="disc-label">Viewability Gap (pp)</div>
-            <div class="disc-value" id="res-gap-pp">—</div>
-          </div>
-          <div class="disc-item">
-            <div class="disc-label">Diff Relativo (%)</div>
-            <div class="disc-value" id="res-diff-pct">—</div>
           </div>
         </div>
 
         <!-- AI Explanation -->
         <div class="explanation">
-          <h3>🤖 Análise da IA</h3>
+          <h3>Análise da IA</h3>
           <div class="explanation-text" id="res-explanation">—</div>
         </div>
       </div>
@@ -598,6 +689,18 @@
       return `${Number(n).toFixed(1)}%`;
     }
 
+    function fmtDiscPct(n) {
+      if (n == null || n === '—') return '—';
+      return `${Number(n).toFixed(2)}%`;
+    }
+
+    function fmtSigned(n) {
+      if (n == null || n === '—') return '—';
+      const num = Number(n);
+      const sign = num > 0 ? '+' : '';
+      return `${sign}${num.toLocaleString('en-US')}`;
+    }
+
     function formatGap(pp) {
       if (pp == null || pp === '—') return '—';
       const sign = pp >= 0 ? '+' : '';
@@ -616,7 +719,16 @@
 
     function setStatus(status) {
       const badge = document.getElementById('res-badge');
-      badge.textContent = status;
+      
+      // Translate status to Portuguese
+      const statusMap = {
+        'Normal': 'Normal',
+        'Attention': 'Atenção',
+        'Alert': 'Alerta'
+      };
+      
+      const displayStatus = statusMap[status] || status;
+      badge.textContent = displayStatus;
       badge.className = 'status-badge';
 
       if (status === 'Normal') {
@@ -635,6 +747,12 @@
       return 'high';
     }
 
+    function getSignedCountClass(value) {
+      if (value > 0) return 'positive';
+      if (value < 0) return 'high';
+      return '';
+    }
+
     function renderResults(data) {
       // Header info
       document.getElementById('res-period').textContent =
@@ -645,29 +763,36 @@
       setStatus(data.status);
 
       // Table
-      document.getElementById('res-pub-served').textContent = fmt(data.pub_served);
       document.getElementById('res-clever-served').textContent = fmt(data.clever_served);
-      document.getElementById('res-pub-viewable').textContent = fmt(data.pub_viewable);
+      document.getElementById('res-pub-served').textContent = fmt(data.pub_served);
       document.getElementById('res-clever-viewable').textContent = fmt(data.clever_viewable);
-      document.getElementById('res-pub-viewability').textContent = fmtPct(data.pub_viewability_pct);
-      document.getElementById('res-clever-viewability').textContent = fmtPct(data.clever_viewability_pct);
+      document.getElementById('res-pub-viewable').textContent = fmt(data.pub_viewable);
+      document.getElementById('res-clever-garbage').textContent = fmt(data.clever_garbage);
+      
+      // Viewability in right-side panel
+      const sidePubViewabilityEl = document.getElementById('res-side-pub-viewability');
+      sidePubViewabilityEl.textContent = fmtPct(data.pub_viewability_pct);
+      sidePubViewabilityEl.className = 'viewability-item-value' + (data.pub_viewability_pct < 50 ? ' viewability-low' : '');
 
-      // Discrepancy
+      const sideCleverViewabilityEl = document.getElementById('res-side-clever-viewability');
+      sideCleverViewabilityEl.textContent = fmtPct(data.clever_viewability_pct);
+      sideCleverViewabilityEl.className = 'viewability-item-value' + (data.clever_viewability_pct < 50 ? ' viewability-low' : '');
+
+      // Discrepancy summary (below table)
+      document.getElementById('res-disc-served-pct').textContent = fmtDiscPct(data.served_discrepancy_pct);
+      document.getElementById('res-disc-viewable-pct').textContent = fmtDiscPct(data.viewable_discrepancy_pct);
+
+      // Base = Clever: positive when Clever > Publisher, negative when Clever < Publisher.
+      const servedDelta = Number(data.clever_served || 0) - Number(data.pub_served || 0);
+      const viewableDelta = Number(data.clever_viewable || 0) - Number(data.pub_viewable || 0);
+
       const diffServedEl = document.getElementById('res-diff-served');
-      diffServedEl.textContent = fmt(data.diff_served);
+      diffServedEl.textContent = fmtSigned(servedDelta);
+      diffServedEl.className = `disc-value ${getSignedCountClass(servedDelta)}`.trim();
 
       const diffViewableEl = document.getElementById('res-diff-viewable');
-      diffViewableEl.textContent = fmt(data.diff_viewable);
-
-      const gapEl = document.getElementById('res-gap-pp');
-      gapEl.textContent = formatGap(data.viewability_diff_pp);
-      gapEl.className = 'disc-value ' + getDiscrepancyClass(data.viewability_diff_pp);
-
-      const pctEl = document.getElementById('res-diff-pct');
-      const pctValue = data.viewability_diff_pct || 0;
-      const sign = pctValue >= 0 ? '+' : '';
-      pctEl.textContent = `${sign}${Number(pctValue).toFixed(1)}%`;
-      pctEl.className = 'disc-value ' + getDiscrepancyClass(data.viewability_diff_pp);
+      diffViewableEl.textContent = fmtSigned(viewableDelta);
+      diffViewableEl.className = `disc-value ${getSignedCountClass(viewableDelta)}`.trim();
 
       // Explanation
       document.getElementById('res-explanation').textContent = data.explanation;
@@ -679,10 +804,11 @@
 
     async function runAnalysis() {
       const reportText = document.getElementById('report-text').value.trim();
+      const scriptId = document.getElementById('script-id').value.trim();
       const publisher = document.getElementById('publisher').value.trim();
 
       if (!reportText) {
-        showError('⚠️ Cole um relatório antes de analisar.');
+        showError('Cole um relatório antes de analisar.');
         return;
       }
 
@@ -698,6 +824,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             report_text: reportText,
+            script_id: scriptId || null,
             publisher: publisher || null,
           }),
         });
@@ -712,7 +839,7 @@
         renderResults(data);
 
       } catch (err) {
-        showError(`❌ Falha na análise: ${err.message}`);
+        showError(`Falha na análise: ${err.message}`);
         document.getElementById('empty-state').classList.remove('hidden');
         document.getElementById('results-container').classList.remove('visible');
       } finally {

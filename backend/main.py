@@ -42,6 +42,7 @@ if os.path.exists(FRONTEND_DIR):
 class AnalyzeRequest(BaseModel):
     report_text: str
     publisher: str | None = None
+    script_id: str | None = None
 
 
 class AnalyzeResponse(BaseModel):
@@ -58,11 +59,14 @@ class AnalyzeResponse(BaseModel):
     # Clever metrics
     clever_served: int
     clever_viewable: int
+    clever_garbage: int
     clever_viewability_pct: float
 
     # Discrepancy
     diff_served: int
     diff_viewable: int
+    served_discrepancy_pct: float
+    viewable_discrepancy_pct: float
     viewability_diff_pp: float
     viewability_diff_pct: float
     status: str
@@ -168,25 +172,27 @@ async def analyze(request: AnalyzeRequest):
     start_date   = parsed["start_date"]
     end_date     = parsed["end_date"]
     publisher    = request.publisher or ""
+    script_id    = (request.script_id or "").strip() or None
 
     # 2. Query Elasticsearch for internal data (using first available index by default)
     try:
         index = get_available_indices()[0]
-        clever_data = query_elasticsearch(index, start_date, end_date, publisher or None)
+        clever_data = query_elasticsearch(index, start_date, end_date, publisher or None, script_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Elasticsearch query failed: {str(e)}")
 
     clever_served   = clever_data["served_impressions"]
     clever_viewable = clever_data["viewable_impressions"]
+    clever_garbage  = clever_data.get("garbage_impressions", 0)
 
     # 3. Calculate discrepancies
-    result = calculate_discrepancy(pub_served, pub_viewable, clever_served, clever_viewable)
+    result = calculate_discrepancy(pub_served, pub_viewable, clever_served, clever_viewable, clever_garbage)
 
     # 4. Generate AI explanation
     try:
         explanation = generate_explanation(result, start_date, end_date, publisher or "Not specified")
     except Exception as e:
-        explanation = f"AI explanation unavailable: {str(e)}"
+        explanation = f"Análise da IA indisponível no momento: {str(e)}"
 
     return AnalyzeResponse(
         start_date=start_date,
@@ -197,9 +203,12 @@ async def analyze(request: AnalyzeRequest):
         pub_viewability_pct=round(result.pub_viewability * 100, 2),
         clever_served=result.clever_served,
         clever_viewable=result.clever_viewable,
+        clever_garbage=clever_garbage,
         clever_viewability_pct=round(result.clever_viewability * 100, 2),
         diff_served=result.diff_served,
         diff_viewable=result.diff_viewable,
+        served_discrepancy_pct=round(result.served_discrepancy_pct, 2),
+        viewable_discrepancy_pct=round(result.viewable_discrepancy_pct, 2),
         viewability_diff_pp=round(result.viewability_diff_pp, 2),
         viewability_diff_pct=round(result.viewability_diff_pct, 2),
         status=result.status,

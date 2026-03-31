@@ -241,6 +241,11 @@
       gap: 8px;
     }
 
+    #file-mode-panel .form-row {
+      gap: 14px;
+      margin: 4px 0 8px;
+    }
+
     .quick-range button {
       border: 1px solid var(--border);
       background: rgba(255, 255, 255, 0.03);
@@ -632,6 +637,7 @@
               <button type="button" id="range-yesterday">Ontem</button>
               <button type="button" id="range-today">Hoje</button>
               <button type="button" id="range-last7">Últimos 7 dias</button>
+              <button type="button" id="range-last30">Últimos 30 dias</button>
             </div>
           </div>
         </div>
@@ -642,10 +648,6 @@
           <div class="form-group">
             <label>Script ID (Kibana)</label>
             <input type="text" id="script-id" placeholder="Ex: 100424" />
-          </div>
-          <div class="form-group">
-            <label>Publisher / Domain</label>
-            <input type="text" id="publisher" placeholder="Ex: example.com" />
           </div>
         </div>
 
@@ -848,6 +850,12 @@
       if (preset === 'last7') {
         start.setDate(start.getDate() - 7);
         setExclusiveRange(start, end);
+        return;
+      }
+
+      if (preset === 'last30') {
+        start.setDate(start.getDate() - 30);
+        setExclusiveRange(start, end);
       }
     }
 
@@ -957,7 +965,6 @@
       const analysisStartDate = document.getElementById('analysis-start-date').value;
       const analysisEndDate = document.getElementById('analysis-end-date').value;
       const scriptId = document.getElementById('script-id').value.trim();
-      const publisher = document.getElementById('publisher').value.trim();
       const isFileMode = document.getElementById('mode-file').classList.contains('active');
 
       if (!isFileMode && !reportText) {
@@ -994,7 +1001,6 @@
           formData.append('start_date', analysisStartDate);
           formData.append('end_date', analysisEndDate);
           if (scriptId) formData.append('script_id', scriptId);
-          if (publisher) formData.append('publisher', publisher);
 
           response = await fetch(`${API_BASE}/analyze-file`, {
             method: 'POST',
@@ -1007,7 +1013,6 @@
             body: JSON.stringify({
               report_text: reportText,
               script_id: scriptId || null,
-              publisher: publisher || null,
             }),
           });
         }
@@ -1040,6 +1045,7 @@
     document.getElementById('range-yesterday').addEventListener('click', () => applyRangePreset('yesterday'));
     document.getElementById('range-today').addEventListener('click', () => applyRangePreset('today'));
     document.getElementById('range-last7').addEventListener('click', () => applyRangePreset('last7'));
+    document.getElementById('range-last30').addEventListener('click', () => applyRangePreset('last30'));
 
     // Default mode
     setInputMode('text');

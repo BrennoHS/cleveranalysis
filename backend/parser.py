@@ -41,6 +41,9 @@ VIEWABLE_LABELS = [
     "viewable ads",
 ]
 
+SERVED_ALIASES = ["si", "served", "served impression", "served impressions"]
+VIEWABLE_ALIASES = ["vi", "viewable", "viewable impression", "viewable impressions", "active view", "active views"]
+
 MONTHS = {
     "jan": 1,
     "january": 1,
@@ -146,6 +149,35 @@ def _extract_labeled_metric(text: str, labels: list[str]) -> Optional[int]:
     return None
 
 
+def _extract_alias_metric_from_lines(text: str, aliases: list[str]) -> Optional[int]:
+    """Extract metric from compact lines such as '9000 vi' or 'si: 10000'."""
+    lines = (text or "").splitlines()
+
+    for line in lines:
+        line_text = (line or "").strip()
+        if not line_text:
+            continue
+
+        for alias in aliases:
+            esc = re.escape(alias)
+
+            # Number-first compact format: 9000 vi
+            m_num_first = re.search(rf"(?i)\b([\d][\d,\.\s]{{0,}})\s*(?:{esc})\b", line_text)
+            if m_num_first:
+                value = _normalize_number(m_num_first.group(1))
+                if value is not None:
+                    return value
+
+            # Label-first compact format: si 10000 / si: 10000
+            m_label_first = re.search(rf"(?i)\b(?:{esc})\b\s*[:=\-]?\s*([\d][\d,\.\s]{{0,}})", line_text)
+            if m_label_first:
+                value = _normalize_number(m_label_first.group(1))
+                if value is not None:
+                    return value
+
+    return None
+
+
 def _to_iso(y: int, m: int, d: int) -> Optional[str]:
     try:
         return date(y, m, d).isoformat()
@@ -244,8 +276,15 @@ def _extract_dates(text: str) -> tuple[Optional[str], Optional[str]]:
 def _deterministic_extract(report_text: str) -> dict:
     text = report_text or ""
 
-    served = _extract_labeled_metric(text, SERVED_LABELS)
-    viewable = _extract_labeled_metric(text, VIEWABLE_LABELS)
+    # First, handle compact aliases on separate lines (e.g. "9000 vi", "10000 si").
+    served = _extract_alias_metric_from_lines(text, SERVED_ALIASES)
+    viewable = _extract_alias_metric_from_lines(text, VIEWABLE_ALIASES)
+
+    # Then apply broader labeled parsing for standard report layouts.
+    if served is None:
+        served = _extract_labeled_metric(text, SERVED_LABELS)
+    if viewable is None:
+        viewable = _extract_labeled_metric(text, VIEWABLE_LABELS)
 
     if served is None or viewable is None:
         # Last-resort fallback: first numeric tokens >= 3 digits.

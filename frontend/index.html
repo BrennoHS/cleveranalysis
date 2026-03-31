@@ -196,6 +196,10 @@
       color: var(--text-muted);
     }
 
+    textarea::placeholder {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
     textarea:focus,
     input:focus {
       border-color: var(--border-strong);
@@ -590,7 +594,6 @@
   <main>
     <div class="app-miniheader">
       <div class="app-name">AdOps Report Analyzer</div>
-      <div class="app-tip">Viewport única • sem scroll da página</div>
     </div>
     <div class="container">
       <div class="input-section">
@@ -848,6 +851,21 @@
       }
     }
 
+    function enableDateCalendarAssist(inputId) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+
+      // Keep field editable, but trigger native picker when supported.
+      const openPicker = () => {
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+        }
+      };
+
+      input.addEventListener('click', openPicker);
+      input.addEventListener('focus', openPicker);
+    }
+
     function setStatus(status) {
       const badge = document.getElementById('res-badge');
       
@@ -1025,6 +1043,8 @@
 
     // Default mode
     setInputMode('text');
+    enableDateCalendarAssist('analysis-start-date');
+    enableDateCalendarAssist('analysis-end-date');
 
     // Ctrl+Enter para submeter
     document.getElementById('report-text').addEventListener('keydown', (e) => {

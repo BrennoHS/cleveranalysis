@@ -99,7 +99,7 @@ ES_VIEWABLE_FIELD=viewable_impressions
 As variáveis opcionais adicionais estão documentadas em `backend/.env.example`
 (`GEMINI_PARSER_*`, `KIBANA_VERSION`, `ES_TIMEZONE`, `ES_PUBLISHER_MATCH_MODE`, `ES_IP_FALLBACK_MAX_HITS`).
 
-> **Observação sobre acesso ao Elasticsearch:** se seu cluster estiver atrás de VPN ou WARP, garanta que está ativo antes de subir o servidor.
+> **Observação sobre acesso ao Elasticsearch:** para cluster atrás de VPN ou WARP (caso da Clever), garanta que está ativo antes de subir o servidor.
 
 ### 4. Iniciar o servidor
 
@@ -149,7 +149,7 @@ Seguindo esses passos, o projeto deve funcionar sem alterações de código.
 
 ## Notas de Segurança
 
-- Nunca faça commit de credenciais reais no controle de versão.
+- Nunca faça commit de credenciais reais no controle de versão (env).
 - Mantenha `backend/.env` somente local.
 - Faça rotação de chaves/senhas que já tenham sido expostas acidentalmente.
 

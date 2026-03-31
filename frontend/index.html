@@ -582,7 +582,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.03);
-      padding: 14px;
+      padding: 16px;
       margin-bottom: 16px;
       display: none;
     }
@@ -595,9 +595,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
+      gap: 16px;
+      margin-bottom: 14px;
       flex-wrap: wrap;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
     .suspicious-title {
@@ -606,21 +608,51 @@
       color: var(--text-soft);
       letter-spacing: 0.5px;
       font-weight: 700;
+      flex: 1;
+      min-width: 200px;
     }
 
     .risk-pill {
       border-radius: 999px;
-      padding: 5px 10px;
+      padding: 6px 12px;
       border: 1px solid var(--border);
       font-size: 11px;
       color: var(--text-main);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Risk level color variants */
+    .risk-pill.risk-normal {
+      background: rgba(127, 226, 176, 0.15);
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+
+    .risk-pill.risk-warn {
+      background: rgba(255, 210, 126, 0.15);
+      border-color: var(--warn);
+      color: var(--warn);
+    }
+
+    .risk-pill.risk-bad {
+      background: rgba(255, 155, 155, 0.15);
+      border-color: var(--bad);
+      color: var(--bad);
+    }
+
+    .risk-pill.risk-critical {
+      background: rgba(255, 100, 100, 0.2);
+      border-color: #ff4d4d;
+      color: #ff6b6b;
+      box-shadow: 0 0 8px rgba(255, 100, 100, 0.3);
     }
 
     .suspicious-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 12px;
+      margin-bottom: 14px;
     }
 
     @media (max-width: 1000px) {
@@ -634,8 +666,13 @@
     .suspicious-kpi {
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 10px;
+      padding: 12px;
       background: rgba(0, 0, 0, 0.22);
+      transition: background 0.2s ease;
+    }
+
+    .suspicious-kpi:hover {
+      background: rgba(0, 0, 0, 0.32);
     }
 
     .suspicious-kpi-label {
@@ -643,19 +680,20 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      margin-bottom: 4px;
     }
 
     .suspicious-kpi-value {
       font-size: 18px;
       font-weight: 700;
-      margin-top: 2px;
+      color: var(--text-main);
     }
 
     .suspicious-sections {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     @media (max-width: 860px) {
@@ -665,8 +703,20 @@
     .suspicious-section-card {
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 10px;
+      padding: 12px;
       background: rgba(0, 0, 0, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .suspicious-section-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--border);
     }
 
     .suspicious-section-title {
@@ -675,24 +725,53 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .suspicious-section-title::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warn);
+    }
+
+    .suspicious-section-card:nth-child(1) .suspicious-section-title::before {
+      background: #6ba3ff;
+    }
+
+    .suspicious-section-card:nth-child(2) .suspicious-section-title::before {
+      background: #ffa366;
     }
 
     .suspicious-section-body {
       font-size: 12px;
       color: var(--text-soft);
-      line-height: 1.6;
+      line-height: 1.7;
       white-space: pre-wrap;
+      opacity: 0.9;
     }
 
     .suspicious-list {
       font-size: 12px;
       color: var(--text-soft);
-      line-height: 1.6;
+      line-height: 1.8;
       white-space: pre-wrap;
       border-top: 1px solid var(--border);
-      padding-top: 10px;
+      padding-top: 14px;
+      margin-top: 14px;
     }
+
+    .suspicious-list strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+
 
     .explanation h3 {
       font-size: 13px;
@@ -843,7 +922,7 @@
                   <td id="res-pub-served">—</td>
                 </tr>
                 <tr>
-                  <td>Viewable Impressions (Adjusted)</td>
+                  <td>Viewable Impressions (Ajustada)</td>
                   <td id="res-clever-viewable">—</td>
                   <td id="res-pub-viewable">—</td>
                 </tr>
@@ -899,7 +978,7 @@
               <div class="suspicious-kpi-value" id="suspicious-score">—</div>
             </div>
             <div class="suspicious-kpi">
-              <div class="suspicious-kpi-label">Concentração top 10 IPs</div>
+              <div class="suspicious-kpi-label">% de repetição de IPs</div>
               <div class="suspicious-kpi-value" id="suspicious-top10-overall">—</div>
             </div>
             <div class="suspicious-kpi">
@@ -921,7 +1000,16 @@
               <div class="suspicious-section-body" id="suspicious-viewable-block">—</div>
             </div>
           </div>
-          <div class="suspicious-list" id="suspicious-top-ips">—</div>
+          <div class="suspicious-sections" id="suspicious-top-ips-container">
+            <div class="suspicious-section-card">
+              <div class="suspicious-section-title">Served Impressions - Top 10 IPs com mais registros</div>
+              <div class="suspicious-section-body" id="suspicious-top-ips-served">—</div>
+            </div>
+            <div class="suspicious-section-card">
+              <div class="suspicious-section-title">Viewable Impressions - Top 10 IPs com mais registros</div>
+              <div class="suspicious-section-body" id="suspicious-top-ips-viewable">—</div>
+            </div>
+          </div>
           <div class="suspicious-list" id="suspicious-flags">—</div>
         </div>
 
@@ -1100,6 +1188,18 @@
 
       const pct = (v) => v != null ? `${Number(v).toFixed(2)}%` : '—';
       const num = (v, digits = 2) => v != null ? Number(v).toFixed(digits) : '—';
+      
+      // Função para mapear risco para cores
+      const getRiskClass = (riskLevel) => {
+        if (!riskLevel) return '';
+        const level = String(riskLevel).toLowerCase();
+        if (level.includes('extremamente alto') || level.includes('crítico')) return 'risk-critical';
+        if (level.includes('alto')) return 'risk-bad';
+        if (level.includes('moderado')) return 'risk-warn';
+        if (level.includes('baixo')) return 'risk-normal';
+        return '';
+      };
+
       const maskIp = (value) => {
         if (value == null) return '—';
         const raw = String(value).trim();
@@ -1129,43 +1229,51 @@
       const overall = payload.overall || {};
       const served = payload.served_analysis || {};
       const viewable = payload.viewable_analysis || {};
-      const topIps = metrics.top_10_ips || [];
+      const topIpsServed = metrics.top_10_ips_served || served.top_10_ips || [];
+      const topIpsViewable = metrics.top_10_ips_viewable || viewable.top_10_ips || [];
+      const topIpsMerged = metrics.top_10_ips_merged || metrics.top_10_ips || [];
       const flags = payload.flags || [];
 
-      document.getElementById('suspicious-risk').textContent = payload.risk_level || 'Análise indisponível';
+      // Atualizar risk-pill com classe de cor
+      const riskElement = document.getElementById('suspicious-risk');
+      riskElement.textContent = payload.risk_level || 'Análise indisponível';
+      riskElement.className = 'risk-pill ' + getRiskClass(payload.risk_level);
+
       document.getElementById('suspicious-score').textContent = payload.risk_score != null ? `${payload.risk_score}/100` : '—';
-      document.getElementById('suspicious-top10-overall').textContent = pct(overall.top10_ip_concentration_pct);
+      const ipRepetitionPct = overall.ip_repetition_pct ?? metrics.ip_repetition_pct;
+      document.getElementById('suspicious-top10-overall').textContent = pct(ipRepetitionPct);
       document.getElementById('suspicious-same-ip').textContent = pct(overall.same_ip_traffic_pct || metrics.same_ip_traffic_pct);
       document.getElementById('suspicious-uniformity').textContent = num(overall.time_uniformity_cv || metrics.time_uniformity_cv, 3);
 
       const sectionText = (section) => {
         if (!section || Object.keys(section).length === 0) return 'Dados insuficientes para esta seção.';
-        const localTopIps = (section.top_10_ips || []).slice(0, 3)
-          .map((item) => `${maskIp(item.value)} (${Number(item.count).toLocaleString('en-US')})`)
-          .join(', ') || 'n/a';
+        const ipAvailable = section.ip_metrics_available !== false;
+        const sameIpValue = ipAvailable ? pct(section.same_ip_traffic_pct) : 'Indisponível';
+        const top10IpValue = ipAvailable ? pct(section.top10_ip_concentration_pct) : 'Indisponível';
 
         return [
           `Registros: ${fmt(section.doc_count)}`,
           `Usuários únicos (IP): ${fmt(section.unique_users_estimate)}`,
-          `% mesmo IP: ${pct(section.same_ip_traffic_pct)}`,
-          `% top 10 IPs: ${pct(section.top10_ip_concentration_pct)}`,
+          `% mesmo IP: ${sameIpValue}`,
+          `% top 10 IPs: ${top10IpValue}`,
           `Pico máximo (usuário/dia): ${fmt(section.max_events_single_user_day || 0)}`,
           `Média eventos por usuário: ${num(section.avg_events_per_user, 2)}`,
           `Tempo médio entre eventos: ${num(section.avg_seconds_between_events, 3)}s`,
           `Tempo médio por usuário: ${num(section.avg_seconds_between_events_per_user, 3)}s`,
-          `Top IPs: ${localTopIps}`,
         ].join('\n');
       };
 
       document.getElementById('suspicious-served-block').textContent = sectionText(served);
       document.getElementById('suspicious-viewable-block').textContent = sectionText(viewable);
 
-      if (topIps.length > 0) {
-        const lines = topIps.slice(0, 10).map((item, idx) => `${idx + 1}. ${maskIp(item.value)} — ${Number(item.count).toLocaleString('en-US')}`);
-        document.getElementById('suspicious-top-ips').textContent = `Top 10 IPs por volume:\n${lines.join('\n')}`;
-      } else {
-        document.getElementById('suspicious-top-ips').textContent = 'Top 10 IPs por volume: dados insuficientes.';
-      }
+      const servedLines = topIpsServed.slice(0, 10).map((item, idx) => `${idx + 1}. ${maskIp(item.value)} — ${Number(item.count).toLocaleString('en-US')}`);
+      const viewableLines = topIpsViewable.slice(0, 10).map((item, idx) => `${idx + 1}. ${maskIp(item.value)} — ${Number(item.count).toLocaleString('en-US')}`);
+
+      const servedContent = servedLines.length > 0 ? servedLines.join('\n') : 'Dados insuficientes.';
+      const viewableContent = viewableLines.length > 0 ? viewableLines.join('\n') : 'Dados insuficientes.';
+
+      document.getElementById('suspicious-top-ips-served').textContent = servedContent;
+      document.getElementById('suspicious-top-ips-viewable').textContent = viewableContent;
 
       if (payload.error) {
         document.getElementById('suspicious-flags').textContent = `Falha na análise de tráfego suspeito: ${payload.error}`;

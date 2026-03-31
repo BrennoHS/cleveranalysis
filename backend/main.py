@@ -14,6 +14,7 @@ from parser import parse_publisher_report
 from report_file_parser import parse_publisher_report_file
 from elastic import (
     query_elasticsearch,
+    analyze_suspicious_traffic,
     get_available_indices,
     get_index_fields,
     get_field_top_values,
@@ -44,6 +45,7 @@ class AnalyzeRequest(BaseModel):
     report_text: str
     publisher: str | None = None
     script_id: str | None = None
+    suspicious_traffic: bool = False
 
 
 class AnalyzeResponse(BaseModel):
@@ -75,6 +77,9 @@ class AnalyzeResponse(BaseModel):
     # AI explanation
     explanation: str
 
+    # Optional suspicious traffic analysis
+    suspicious_analysis: dict | None = None
+
 
 class IndexField(BaseModel):
     name: str
@@ -100,6 +105,7 @@ def _run_analysis_pipeline(
     parsed: dict,
     publisher: str | None,
     script_id: str | None,
+    suspicious_traffic: bool = False,
 ) -> AnalyzeResponse:
     missing = [f for f in ("served_impressions", "start_date", "end_date") if not parsed.get(f)]
     if missing:
@@ -130,8 +136,32 @@ def _run_analysis_pipeline(
 
     result = calculate_discrepancy(pub_served, pub_viewable, clever_served, clever_viewable, clever_garbage)
 
+    suspicious_analysis: dict | None = None
+    if suspicious_traffic:
+        try:
+            suspicious_analysis = analyze_suspicious_traffic(
+                start_date=start_date,
+                end_date=end_date,
+                publisher=publisher_safe or None,
+                script_id=script_id_safe,
+                served_impressions=clever_served,
+                viewable_impressions=clever_viewable,
+                garbage_impressions=clever_garbage,
+            )
+        except Exception as e:
+            suspicious_analysis = {
+                "enabled": True,
+                "error": f"Failed to run suspicious traffic analysis: {str(e)}",
+            }
+
     try:
-        explanation = generate_explanation(result, start_date, end_date, publisher_safe or "Not specified")
+        explanation = generate_explanation(
+            result,
+            start_date,
+            end_date,
+            publisher_safe or "Not specified",
+            suspicious_analysis=suspicious_analysis,
+        )
     except Exception as e:
         explanation = f"Análise da IA indisponível no momento: {str(e)}"
 
@@ -154,6 +184,7 @@ def _run_analysis_pipeline(
         viewability_diff_pct=round(result.viewability_diff_pct, 2),
         status=result.status,
         explanation=explanation,
+        suspicious_analysis=suspicious_analysis,
     )
 
 
@@ -218,7 +249,7 @@ async def analyze(request: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse report: {str(e)}")
 
-    return _run_analysis_pipeline(parsed, request.publisher, request.script_id)
+    return _run_analysis_pipeline(parsed, request.publisher, request.script_id, request.suspicious_traffic)
 
 
 @app.post("/analyze-file", response_model=AnalyzeResponse)
@@ -228,6 +259,7 @@ async def analyze_file(
     end_date: str = Form(...),
     publisher: str | None = Form(None),
     script_id: str | None = Form(None),
+    suspicious_traffic: bool = Form(False),
 ):
     """
     Analyze endpoint for structured report files (.xlsx/.csv) with a date range.
@@ -241,4 +273,4 @@ async def analyze_file(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse uploaded report: {str(e)}")
 
-    return _run_analysis_pipeline(parsed, publisher, script_id)
+    return _run_analysis_pipeline(parsed, publisher, script_id, suspicious_traffic)

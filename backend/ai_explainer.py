@@ -104,6 +104,7 @@ def generate_explanation(
     start_date: str,
     end_date: str,
     publisher: str,
+    suspicious_analysis: dict | None = None,
 ) -> str:
     """
     Calls Gemini to generate a professional explanation of the discrepancy.
@@ -130,6 +131,42 @@ def generate_explanation(
         end_date=end_date,
         publisher=publisher or "Not specified",
     )
+
+    if suspicious_analysis and suspicious_analysis.get("enabled"):
+        metrics = suspicious_analysis.get("metrics", {})
+        overall = suspicious_analysis.get("overall", {})
+        served = suspicious_analysis.get("served_analysis", {})
+        viewable = suspicious_analysis.get("viewable_analysis", {})
+        flags = suspicious_analysis.get("flags", [])
+        top_ips = metrics.get("top_10_ips", [])[:5]
+        top_ip_text = ", ".join(f"{i.get('value')} ({i.get('count')})" for i in top_ips) if top_ips else "n/a"
+        flags_text = "; ".join(flags) if flags else "nenhum gatilho crítico"
+
+        prompt += (
+            "\n\nAnálise determinística adicional de tráfego suspeito (checkbox ativado):\n"
+            f"- Risk score: {suspicious_analysis.get('risk_score', 'n/a')}/100\n"
+            f"- Risk level: {suspicious_analysis.get('risk_level', 'n/a')}\n"
+            f"- % top 10 IPs (geral): {overall.get('top10_ip_concentration_pct', 'n/a')}\n"
+            f"- % mesmo IP (geral): {overall.get('same_ip_traffic_pct', metrics.get('same_ip_traffic_pct', 'n/a'))}\n"
+            f"- % diversidade de IPs (geral): {overall.get('ip_diversity_pct', 'n/a')}\n"
+            f"- % concentração por região (top): {overall.get('top_region_pct', 'n/a')}\n"
+            f"- Diversidade de resoluções (únicas): {overall.get('unique_resolution_total', 'n/a')}\n"
+            f"- Registros >20/dia (geral): {overall.get('records_over_20_per_day', 'n/a')}\n"
+            f"- Registros >50/dia (geral): {overall.get('records_over_50_per_day', 'n/a')}\n"
+            f"- Registros >100/dia (geral): {overall.get('records_over_100_per_day', 'n/a')}\n"
+            f"- Usuários repetindo >20/dia: {overall.get('repeat_users_over_20_days', 'n/a')}\n"
+            f"- Pico máximo usuário/dia: {overall.get('max_events_single_user_day', 'n/a')}\n"
+            f"- Sinais críticos simultâneos: {overall.get('critical_signal_count', 'n/a')}\n"
+            f"- Tempo uniforme (CV): {overall.get('time_uniformity_cv', metrics.get('time_uniformity_cv', 'n/a'))}\n"
+            f"- Served -> % top 10 IPs: {served.get('top10_ip_concentration_pct', 'n/a')}, "
+            f"tempo médio por usuário (s): {served.get('avg_seconds_between_events_per_user', 'n/a')}\n"
+            f"- Viewable -> % top 10 IPs: {viewable.get('top10_ip_concentration_pct', 'n/a')}, "
+            f"tempo médio por usuário (s): {viewable.get('avg_seconds_between_events_per_user', 'n/a')}\n"
+            f"- Top IPs: {top_ip_text}\n"
+            f"- Flags: {flags_text}\n\n"
+            "No final da análise, inclua um parecer objetivo sobre risco de tráfego inválido com uma classificação clara"
+            " (baixo/moderado/alto) e recomendação operacional (ex.: monitorar, investigar profundamente, pausar campanha)."
+        )
 
     try:
         response = model.generate_content(

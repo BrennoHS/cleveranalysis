@@ -554,6 +554,146 @@
       padding: 16px;
     }
 
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .check-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #ffffff;
+      cursor: pointer;
+    }
+
+    .check-row label {
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .suspicious-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .suspicious-panel.visible {
+      display: block;
+    }
+
+    .suspicious-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .suspicious-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--text-soft);
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
+
+    .risk-pill {
+      border-radius: 999px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-main);
+    }
+
+    .suspicious-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 1000px) {
+      .suspicious-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 700px) {
+      .suspicious-grid { grid-template-columns: 1fr; }
+    }
+
+    .suspicious-kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    .suspicious-kpi-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .suspicious-kpi-value {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .suspicious-sections {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 860px) {
+      .suspicious-sections { grid-template-columns: 1fr; }
+    }
+
+    .suspicious-section-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    .suspicious-section-title {
+      font-size: 11px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .suspicious-section-body {
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .suspicious-list {
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
     .explanation h3 {
       font-size: 13px;
       margin-bottom: 10px;
@@ -649,6 +789,10 @@
             <label>Script ID (Kibana)</label>
             <input type="text" id="script-id" placeholder="Ex: 100424" />
           </div>
+          <div class="check-row">
+            <input type="checkbox" id="suspicious-traffic" />
+            <label for="suspicious-traffic">Suspeita de tráfego não confiável</label>
+          </div>
         </div>
 
         <button class="btn" id="btn-analyze">
@@ -742,6 +886,43 @@
             <div class="disc-label">Δ Viewable (Clever - Publisher)</div>
             <div class="disc-value" id="res-diff-viewable">—</div>
           </div>
+        </div>
+
+        <div class="suspicious-panel" id="suspicious-panel">
+          <div class="suspicious-head">
+            <div class="suspicious-title">Análise Determinística de Tráfego Suspeito</div>
+            <div class="risk-pill" id="suspicious-risk">—</div>
+          </div>
+          <div class="suspicious-grid">
+            <div class="suspicious-kpi">
+              <div class="suspicious-kpi-label">Score de risco</div>
+              <div class="suspicious-kpi-value" id="suspicious-score">—</div>
+            </div>
+            <div class="suspicious-kpi">
+              <div class="suspicious-kpi-label">Concentração top 10 IPs</div>
+              <div class="suspicious-kpi-value" id="suspicious-top10-overall">—</div>
+            </div>
+            <div class="suspicious-kpi">
+              <div class="suspicious-kpi-label">Maior % no mesmo IP</div>
+              <div class="suspicious-kpi-value" id="suspicious-same-ip">—</div>
+            </div>
+            <div class="suspicious-kpi">
+              <div class="suspicious-kpi-label">Uniformidade temporal (CV)</div>
+              <div class="suspicious-kpi-value" id="suspicious-uniformity">—</div>
+            </div>
+          </div>
+          <div class="suspicious-sections">
+            <div class="suspicious-section-card">
+              <div class="suspicious-section-title">Served Impressions</div>
+              <div class="suspicious-section-body" id="suspicious-served-block">—</div>
+            </div>
+            <div class="suspicious-section-card">
+              <div class="suspicious-section-title">Viewable Impressions</div>
+              <div class="suspicious-section-body" id="suspicious-viewable-block">—</div>
+            </div>
+          </div>
+          <div class="suspicious-list" id="suspicious-top-ips">—</div>
+          <div class="suspicious-list" id="suspicious-flags">—</div>
         </div>
 
         <div class="explanation">
@@ -910,6 +1091,93 @@
       return '';
     }
 
+    function renderSuspiciousAnalysis(payload) {
+      const panel = document.getElementById('suspicious-panel');
+      if (!payload || !payload.enabled) {
+        panel.classList.remove('visible');
+        return;
+      }
+
+      const pct = (v) => v != null ? `${Number(v).toFixed(2)}%` : '—';
+      const num = (v, digits = 2) => v != null ? Number(v).toFixed(digits) : '—';
+      const maskIp = (value) => {
+        if (value == null) return '—';
+        const raw = String(value).trim();
+        if (!raw) return '—';
+
+        if (raw.includes('.')) {
+          const parts = raw.split('.');
+          if (parts.length === 4) {
+            parts[3] = 'xxx';
+            return parts.join('.');
+          }
+          const lastDot = raw.lastIndexOf('.');
+          if (lastDot > 0) return `${raw.slice(0, lastDot)}.xxx`;
+        }
+
+        if (raw.includes(':')) {
+          const parts = raw.split(':');
+          if (parts.length > 2) {
+            return parts.map((segment, idx) => idx >= parts.length - 2 ? 'xxxx' : segment).join(':');
+          }
+        }
+
+        return raw;
+      };
+
+      const metrics = payload.metrics || {};
+      const overall = payload.overall || {};
+      const served = payload.served_analysis || {};
+      const viewable = payload.viewable_analysis || {};
+      const topIps = metrics.top_10_ips || [];
+      const flags = payload.flags || [];
+
+      document.getElementById('suspicious-risk').textContent = payload.risk_level || 'Análise indisponível';
+      document.getElementById('suspicious-score').textContent = payload.risk_score != null ? `${payload.risk_score}/100` : '—';
+      document.getElementById('suspicious-top10-overall').textContent = pct(overall.top10_ip_concentration_pct);
+      document.getElementById('suspicious-same-ip').textContent = pct(overall.same_ip_traffic_pct || metrics.same_ip_traffic_pct);
+      document.getElementById('suspicious-uniformity').textContent = num(overall.time_uniformity_cv || metrics.time_uniformity_cv, 3);
+
+      const sectionText = (section) => {
+        if (!section || Object.keys(section).length === 0) return 'Dados insuficientes para esta seção.';
+        const localTopIps = (section.top_10_ips || []).slice(0, 3)
+          .map((item) => `${maskIp(item.value)} (${Number(item.count).toLocaleString('en-US')})`)
+          .join(', ') || 'n/a';
+
+        return [
+          `Registros: ${fmt(section.doc_count)}`,
+          `Usuários únicos (IP): ${fmt(section.unique_users_estimate)}`,
+          `% mesmo IP: ${pct(section.same_ip_traffic_pct)}`,
+          `% top 10 IPs: ${pct(section.top10_ip_concentration_pct)}`,
+          `Pico máximo (usuário/dia): ${fmt(section.max_events_single_user_day || 0)}`,
+          `Média eventos por usuário: ${num(section.avg_events_per_user, 2)}`,
+          `Tempo médio entre eventos: ${num(section.avg_seconds_between_events, 3)}s`,
+          `Tempo médio por usuário: ${num(section.avg_seconds_between_events_per_user, 3)}s`,
+          `Top IPs: ${localTopIps}`,
+        ].join('\n');
+      };
+
+      document.getElementById('suspicious-served-block').textContent = sectionText(served);
+      document.getElementById('suspicious-viewable-block').textContent = sectionText(viewable);
+
+      if (topIps.length > 0) {
+        const lines = topIps.slice(0, 10).map((item, idx) => `${idx + 1}. ${maskIp(item.value)} — ${Number(item.count).toLocaleString('en-US')}`);
+        document.getElementById('suspicious-top-ips').textContent = `Top 10 IPs por volume:\n${lines.join('\n')}`;
+      } else {
+        document.getElementById('suspicious-top-ips').textContent = 'Top 10 IPs por volume: dados insuficientes.';
+      }
+
+      if (payload.error) {
+        document.getElementById('suspicious-flags').textContent = `Falha na análise de tráfego suspeito: ${payload.error}`;
+      } else if (flags.length > 0) {
+        document.getElementById('suspicious-flags').textContent = `Sinais relevantes:\n- ${flags.join('\n- ')}`;
+      } else {
+        document.getElementById('suspicious-flags').textContent = 'Sinais relevantes: nenhum gatilho crítico detectado.';
+      }
+
+      panel.classList.add('visible');
+    }
+
     function renderResults(data) {
       // Header info
       document.getElementById('res-period').textContent =
@@ -953,6 +1221,7 @@
 
       // Explanation
       document.getElementById('res-explanation').textContent = data.explanation;
+      renderSuspiciousAnalysis(data.suspicious_analysis);
 
       // Show results
       document.getElementById('empty-state').classList.add('hidden');
@@ -965,6 +1234,7 @@
       const analysisStartDate = document.getElementById('analysis-start-date').value;
       const analysisEndDate = document.getElementById('analysis-end-date').value;
       const scriptId = document.getElementById('script-id').value.trim();
+      const suspiciousTraffic = document.getElementById('suspicious-traffic').checked;
       const isFileMode = document.getElementById('mode-file').classList.contains('active');
 
       if (!isFileMode && !reportText) {
@@ -1001,6 +1271,7 @@
           formData.append('start_date', analysisStartDate);
           formData.append('end_date', analysisEndDate);
           if (scriptId) formData.append('script_id', scriptId);
+          formData.append('suspicious_traffic', suspiciousTraffic ? 'true' : 'false');
 
           response = await fetch(`${API_BASE}/analyze-file`, {
             method: 'POST',
@@ -1013,6 +1284,7 @@
             body: JSON.stringify({
               report_text: reportText,
               script_id: scriptId || null,
+              suspicious_traffic: suspiciousTraffic,
             }),
           });
         }

@@ -1,61 +1,262 @@
 """
-parser.py — Uses Gemini API to extract structured metrics from raw publisher reports.
+parser.py - Deterministic extraction of publisher metrics from raw reports.
+Optional Gemini fallback can be enabled via GEMINI_PARSER_ENABLED.
 """
 
-import os
 import json
+import os
 import re
-import google.generativeai as genai
+from datetime import date
+from typing import Optional
+
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+PARSER_ENABLED = _env_bool("GEMINI_PARSER_ENABLED", False)
 PARSER_MODEL = os.environ.get("GEMINI_PARSER_MODEL", "gemini-flash-lite-latest")
 PARSER_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_PARSER_MAX_OUTPUT_TOKENS", "256"))
 
+SERVED_LABELS = [
+    "served impressions",
+    "impressions served",
+    "impressions",
+    "measurable",
+    "total impressions",
+]
+
+VIEWABLE_LABELS = [
+    "viewable impressions",
+    "viewable",
+    "active views",
+    "active view",
+    "viewable ads",
+]
+
+MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "fev": 2,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "abr": 4,
+    "apr": 4,
+    "april": 4,
+    "mai": 5,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "ago": 8,
+    "aug": 8,
+    "august": 8,
+    "set": 9,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "out": 10,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dez": 12,
+    "dec": 12,
+    "december": 12,
+}
+
+MONTH_NAMES_PATTERN = (
+    r"jan(?:uary)?|fev|feb(?:ruary)?|mar(?:ch)?|abr|apr(?:il)?|mai|may|"
+    r"jun(?:e)?|jul(?:y)?|ago|aug(?:ust)?|set|sep(?:t(?:ember)?)?|"
+    r"out|oct(?:ober)?|nov(?:ember)?|dez|dec(?:ember)?"
+)
+
+DATE_TOKEN = (
+    r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|"
+    r"\d{1,2}\s+(?:" + MONTH_NAMES_PATTERN + r")\s+\d{4}|"
+    r"(?:" + MONTH_NAMES_PATTERN + r")\s+\d{1,2},?\s+\d{4})"
+)
 
 EXTRACTION_PROMPT = """
 You are an AdOps data extraction assistant. Your ONLY task is to extract metrics from raw text and return a JSON object.
 
 Extract ONLY these 4 metrics from the publisher report:
-
-1. served_impressions — An integer (no commas, decimals or text)
-2. viewable_impressions — An integer (no commas, decimals or text)
-3. start_date — ISO format YYYY-MM-DD string, or null
-4. end_date — ISO format YYYY-MM-DD string, or null
+1. served_impressions (integer)
+2. viewable_impressions (integer)
+3. start_date (ISO YYYY-MM-DD or null)
+4. end_date (ISO YYYY-MM-DD or null)
 
 Rules:
-- Return ONLY a valid JSON object with no other text
-- Do not include markdown fences (no ``` symbols)
-- Do not add any explanation or comments
-- If a value is missing, use null
-- Numbers must be plain integers only
+- Return ONLY valid JSON, no markdown
+- If missing, use null
 
 Publisher Report:
 \"\"\"
 {report_text}
 \"\"\"
 
-Return ONLY this JSON (nothing else):
+Return only:
 {{"served_impressions": <number_or_null>, "viewable_impressions": <number_or_null>, "start_date": "<YYYY-MM-DD_or_null>", "end_date": "<YYYY-MM-DD_or_null>"}}
 """
 
 
-def _fallback_extract_from_text(report_text: str) -> dict:
-    """Best-effort extraction if model output is malformed."""
+def _normalize_number(raw: str) -> Optional[int]:
+    if raw is None:
+        return None
+    digits = re.sub(r"[^\d]", "", str(raw))
+    if not digits:
+        return None
+    return int(digits)
+
+
+def _extract_labeled_metric(text: str, labels: list[str]) -> Optional[int]:
+    for label in labels:
+        escaped = re.escape(label)
+
+        # Label-first lines, including table-like separators.
+        pattern_primary = re.compile(
+            rf"(?im)^\s*(?:{escaped})\b[^\d\n]{{0,24}}([\d][\d,\.\s]{{2,}})",
+        )
+        match = pattern_primary.search(text)
+        if match:
+            value = _normalize_number(match.group(1))
+            if value is not None:
+                return value
+
+        # More permissive inline fallback when label appears in sentence text.
+        pattern_fallback = re.compile(
+            rf"(?i)\b(?:{escaped})\b[^\d\n]{{0,40}}([\d][\d,\.\s]{{2,}})",
+        )
+        match = pattern_fallback.search(text)
+        if match:
+            value = _normalize_number(match.group(1))
+            if value is not None:
+                return value
+
+    return None
+
+
+def _to_iso(y: int, m: int, d: int) -> Optional[str]:
+    try:
+        return date(y, m, d).isoformat()
+    except ValueError:
+        return None
+
+
+def _parse_numeric_date(raw: str, prefer_day_first: bool) -> Optional[str]:
+    parts = re.split(r"[/-]", raw.strip())
+    if len(parts) != 3:
+        return None
+
+    a, b, c = [p.strip() for p in parts]
+    if len(a) == 4:
+        return _to_iso(int(a), int(b), int(c))
+
+    if len(c) == 2:
+        year = 2000 + int(c)
+    else:
+        year = int(c)
+
+    p1 = int(a)
+    p2 = int(b)
+
+    if p1 > 12:
+        day, month = p1, p2
+    elif p2 > 12:
+        month, day = p1, p2
+    else:
+        if prefer_day_first:
+            day, month = p1, p2
+        else:
+            month, day = p1, p2
+
+    return _to_iso(year, month, day)
+
+
+def _parse_textual_date(raw: str) -> Optional[str]:
+    s = re.sub(r",", "", raw.lower()).strip()
+
+    # Month-first: Jan 31 2025
+    m1 = re.match(rf"^(?P<mon>{MONTH_NAMES_PATTERN})\s+(?P<day>\d{{1,2}})\s+(?P<year>\d{{4}})$", s)
+    if m1:
+        month = MONTHS.get(m1.group("mon"))
+        return _to_iso(int(m1.group("year")), int(month), int(m1.group("day"))) if month else None
+
+    # Day-first: 31 Jan 2025
+    m2 = re.match(rf"^(?P<day>\d{{1,2}})\s+(?P<mon>{MONTH_NAMES_PATTERN})\s+(?P<year>\d{{4}})$", s)
+    if m2:
+        month = MONTHS.get(m2.group("mon"))
+        return _to_iso(int(m2.group("year")), int(month), int(m2.group("day"))) if month else None
+
+    return None
+
+
+def _parse_date_token(raw: str, prefer_day_first: bool) -> Optional[str]:
+    token = raw.strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", token):
+        return token
+    if re.match(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$", token):
+        return _parse_numeric_date(token, prefer_day_first)
+    return _parse_textual_date(token)
+
+
+def _extract_dates(text: str) -> tuple[Optional[str], Optional[str]]:
+    prefer_day_first = bool(re.search(r"\b(periodo|publisher|relatorio)\b", text.lower()))
+
+    range_pattern = re.compile(
+        rf"(?i)(?:period|periodo|from|de)\s*[:\-]?\s*(?P<d1>{DATE_TOKEN})\s*(?:to|ate|a|\-|\u2013|\u2014)\s*(?P<d2>{DATE_TOKEN})",
+    )
+    m = range_pattern.search(text)
+    if m:
+        start = _parse_date_token(m.group("d1"), prefer_day_first)
+        end = _parse_date_token(m.group("d2"), prefer_day_first)
+        if start and end:
+            return (start, end) if start <= end else (end, start)
+
+    candidates: list[tuple[int, str]] = []
+    token_pattern = re.compile(DATE_TOKEN, re.IGNORECASE)
+    for match in token_pattern.finditer(text):
+        parsed = _parse_date_token(match.group(0), prefer_day_first)
+        if parsed:
+            candidates.append((match.start(), parsed))
+
+    if len(candidates) >= 2:
+        candidates.sort(key=lambda x: x[0])
+        start, end = candidates[0][1], candidates[1][1]
+        return (start, end) if start <= end else (end, start)
+
+    if len(candidates) == 1:
+        return candidates[0][1], None
+
+    return None, None
+
+
+def _deterministic_extract(report_text: str) -> dict:
     text = report_text or ""
 
-    # Extract first two large numeric values as served/viewable fallback.
-    nums = re.findall(r"\b\d{3,}\b", text)
-    served = int(nums[0]) if len(nums) >= 1 else None
-    viewable = int(nums[1]) if len(nums) >= 2 else None
+    served = _extract_labeled_metric(text, SERVED_LABELS)
+    viewable = _extract_labeled_metric(text, VIEWABLE_LABELS)
 
-    # Extract dates in YYYY-MM-DD format.
-    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", text)
-    start_date = dates[0] if len(dates) >= 1 else None
-    end_date = dates[1] if len(dates) >= 2 else None
+    if served is None or viewable is None:
+        # Last-resort fallback: first numeric tokens >= 3 digits.
+        nums = [_normalize_number(n) for n in re.findall(r"\b\d[\d,\.\s]{2,}\b", text)]
+        nums = [n for n in nums if n is not None]
+        if served is None and len(nums) >= 1:
+            served = nums[0]
+        if viewable is None and len(nums) >= 2:
+            viewable = nums[1]
+
+    start_date, end_date = _extract_dates(text)
 
     return {
         "served_impressions": served,
@@ -65,15 +266,46 @@ def _fallback_extract_from_text(report_text: str) -> dict:
     }
 
 
-def parse_publisher_report(report_text: str) -> dict:
-    """
-    Sends the raw publisher report to Gemini and returns extracted metrics.
-    Returns a dict with keys: served_impressions, viewable_impressions, start_date, end_date.
-    """
+def _parse_ai_json(raw: str, report_text: str) -> dict:
+    text = (raw or "").strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    text = text.strip()
+
+    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if json_match:
+        text = json_match.group(0)
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        fallback = _deterministic_extract(report_text)
+        if fallback.get("served_impressions") and fallback.get("start_date") and fallback.get("end_date"):
+            return fallback
+        raise ValueError(f"Failed to parse JSON from Gemini response: {exc}") from exc
+
+    for field in ("served_impressions", "viewable_impressions"):
+        parsed[field] = _normalize_number(parsed.get(field))
+
+    return {
+        "served_impressions": parsed.get("served_impressions"),
+        "viewable_impressions": parsed.get("viewable_impressions"),
+        "start_date": parsed.get("start_date"),
+        "end_date": parsed.get("end_date"),
+    }
+
+
+def _parse_with_gemini(report_text: str) -> dict:
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is missing, cannot use parser fallback model")
+
+    import google.generativeai as genai
+
+    genai.configure(api_key=api_key)
     model = genai.GenerativeModel(PARSER_MODEL)
 
     prompt = EXTRACTION_PROMPT.format(report_text=report_text.strip())
-
     response = model.generate_content(
         prompt,
         generation_config=genai.types.GenerationConfig(
@@ -81,33 +313,29 @@ def parse_publisher_report(report_text: str) -> dict:
             max_output_tokens=PARSER_MAX_OUTPUT_TOKENS,
         ),
     )
+    return _parse_ai_json(response.text or "", report_text)
 
-    raw = response.text.strip()
 
-    # Strip markdown fences if Gemini adds them despite instructions
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    raw = raw.strip()
+def parse_publisher_report(report_text: str) -> dict:
+    """
+    Deterministic parser by default.
+    If GEMINI_PARSER_ENABLED=true, Gemini can complement missing fields.
+    """
+    deterministic = _deterministic_extract(report_text)
+    required = ("served_impressions", "start_date", "end_date")
 
-    # Try to extract JSON object from the response
-    # In case there's extra text before/after
-    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-    if json_match:
-        raw = json_match.group(0)
+    if all(deterministic.get(field) is not None for field in required):
+        return deterministic
 
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as e:
-        fallback = _fallback_extract_from_text(report_text)
-        if fallback.get("served_impressions") and fallback.get("start_date") and fallback.get("end_date"):
-            return fallback
-        # More helpful error message
-        raise ValueError(f"Failed to parse JSON from Gemini response: {str(e)}\nRaw response: {raw[:200]}")
+    if not PARSER_ENABLED:
+        return deterministic
 
-    # Sanitize: ensure numeric fields are ints if present
-    for field in ("served_impressions", "viewable_impressions"):
-        val = parsed.get(field)
-        if val is not None:
-            parsed[field] = int(str(val).replace(",", "").replace(".", "").strip())
+    parsed_ai = _parse_with_gemini(report_text)
 
-    return parsed
+    # Keep deterministic values first, and fill only missing fields with AI output.
+    merged = deterministic.copy()
+    for key in ("served_impressions", "viewable_impressions", "start_date", "end_date"):
+        if merged.get(key) is None and parsed_ai.get(key) is not None:
+            merged[key] = parsed_ai[key]
+
+    return merged

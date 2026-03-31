@@ -3,7 +3,7 @@ main.py — FastAPI backend for the AdOps Discrepancy Analysis Tool.
 """
 
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from parser import parse_publisher_report
+from report_file_parser import parse_publisher_report_file
 from elastic import (
     query_elasticsearch,
     get_available_indices,
@@ -95,6 +96,67 @@ class FieldValuesResponse(BaseModel):
     total_docs: int
 
 
+def _run_analysis_pipeline(
+    parsed: dict,
+    publisher: str | None,
+    script_id: str | None,
+) -> AnalyzeResponse:
+    missing = [f for f in ("served_impressions", "start_date", "end_date") if not parsed.get(f)]
+    if missing:
+        extracted_fields = {k: v for k, v in parsed.items() if v is not None}
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not extract required fields from report: {', '.join(missing)}. "
+                   f"Report must contain impression counts and date range. "
+                   f"(Extracted: {extracted_fields if extracted_fields else 'nothing'})",
+        )
+
+    pub_served = parsed["served_impressions"]
+    pub_viewable = parsed.get("viewable_impressions") or 0
+    start_date = parsed["start_date"]
+    end_date = parsed["end_date"]
+    publisher_safe = publisher or ""
+    script_id_safe = (script_id or "").strip() or None
+
+    try:
+        index = get_available_indices()[0]
+        clever_data = query_elasticsearch(index, start_date, end_date, publisher_safe or None, script_id_safe)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Elasticsearch query failed: {str(e)}")
+
+    clever_served = clever_data["served_impressions"]
+    clever_viewable = clever_data["viewable_impressions"]
+    clever_garbage = clever_data.get("garbage_impressions", 0)
+
+    result = calculate_discrepancy(pub_served, pub_viewable, clever_served, clever_viewable, clever_garbage)
+
+    try:
+        explanation = generate_explanation(result, start_date, end_date, publisher_safe or "Not specified")
+    except Exception as e:
+        explanation = f"Análise da IA indisponível no momento: {str(e)}"
+
+    return AnalyzeResponse(
+        start_date=start_date,
+        end_date=end_date,
+        publisher=publisher_safe or "Not specified",
+        pub_served=result.pub_served,
+        pub_viewable=result.pub_viewable,
+        pub_viewability_pct=round(result.pub_viewability * 100, 2),
+        clever_served=result.clever_served,
+        clever_viewable=result.clever_viewable,
+        clever_garbage=clever_garbage,
+        clever_viewability_pct=round(result.clever_viewability * 100, 2),
+        diff_served=result.diff_served,
+        diff_viewable=result.diff_viewable,
+        served_discrepancy_pct=round(result.served_discrepancy_pct, 2),
+        viewable_discrepancy_pct=round(result.viewable_discrepancy_pct, 2),
+        viewability_diff_pp=round(result.viewability_diff_pp, 2),
+        viewability_diff_pct=round(result.viewability_diff_pct, 2),
+        status=result.status,
+        explanation=explanation,
+    )
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -150,67 +212,33 @@ async def analyze(request: AnalyzeRequest):
             detail="Report text is empty. Please paste the publisher report."
         )
     
-    # 1. Parse publisher report with Gemini
+    # 1. Parse publisher report (deterministic parser with optional AI fallback)
     try:
         parsed = parse_publisher_report(request.report_text)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Failed to parse report with AI: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"Failed to parse report: {str(e)}")
 
-    # Validate required fields
-    missing = [f for f in ("served_impressions", "start_date", "end_date") if not parsed.get(f)]
-    if missing:
-        extracted_fields = {k: v for k, v in parsed.items() if v is not None}
-        raise HTTPException(
-            status_code=422,
-            detail=f"Could not extract required fields from report: {', '.join(missing)}. "
-                   f"Report must contain impression counts and date range. "
-                   f"(Extracted: {extracted_fields if extracted_fields else 'nothing'})",
-        )
+    return _run_analysis_pipeline(parsed, request.publisher, request.script_id)
 
-    pub_served   = parsed["served_impressions"]
-    pub_viewable = parsed.get("viewable_impressions") or 0
-    start_date   = parsed["start_date"]
-    end_date     = parsed["end_date"]
-    publisher    = request.publisher or ""
-    script_id    = (request.script_id or "").strip() or None
 
-    # 2. Query Elasticsearch for internal data (using first available index by default)
+@app.post("/analyze-file", response_model=AnalyzeResponse)
+async def analyze_file(
+    file: UploadFile = File(...),
+    start_date: str = Form(...),
+    end_date: str = Form(...),
+    publisher: str | None = Form(None),
+    script_id: str | None = Form(None),
+):
+    """
+    Analyze endpoint for structured report files (.xlsx/.csv) with a date range.
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=422, detail="Uploaded report file is empty.")
+
     try:
-        index = get_available_indices()[0]
-        clever_data = query_elasticsearch(index, start_date, end_date, publisher or None, script_id)
+        parsed = parse_publisher_report_file(content, file.filename or "", start_date, end_date)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Elasticsearch query failed: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"Failed to parse uploaded report: {str(e)}")
 
-    clever_served   = clever_data["served_impressions"]
-    clever_viewable = clever_data["viewable_impressions"]
-    clever_garbage  = clever_data.get("garbage_impressions", 0)
-
-    # 3. Calculate discrepancies
-    result = calculate_discrepancy(pub_served, pub_viewable, clever_served, clever_viewable, clever_garbage)
-
-    # 4. Generate AI explanation
-    try:
-        explanation = generate_explanation(result, start_date, end_date, publisher or "Not specified")
-    except Exception as e:
-        explanation = f"Análise da IA indisponível no momento: {str(e)}"
-
-    return AnalyzeResponse(
-        start_date=start_date,
-        end_date=end_date,
-        publisher=publisher or "Not specified",
-        pub_served=result.pub_served,
-        pub_viewable=result.pub_viewable,
-        pub_viewability_pct=round(result.pub_viewability * 100, 2),
-        clever_served=result.clever_served,
-        clever_viewable=result.clever_viewable,
-        clever_garbage=clever_garbage,
-        clever_viewability_pct=round(result.clever_viewability * 100, 2),
-        diff_served=result.diff_served,
-        diff_viewable=result.diff_viewable,
-        served_discrepancy_pct=round(result.served_discrepancy_pct, 2),
-        viewable_discrepancy_pct=round(result.viewable_discrepancy_pct, 2),
-        viewability_diff_pp=round(result.viewability_diff_pp, 2),
-        viewability_diff_pct=round(result.viewability_diff_pct, 2),
-        status=result.status,
-        explanation=explanation,
-    )
+    return _run_analysis_pipeline(parsed, publisher, script_id)

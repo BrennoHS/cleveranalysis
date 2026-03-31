@@ -1,6 +1,6 @@
 # AdOps Discrepancy Analyzer
 
-An AI-powered internal tool for comparing publisher ad reports against internal Clever/Elasticsearch ad server data. Built for AdOps and Support Engineers.
+An internal tool for comparing publisher ad reports against internal Clever/Elasticsearch ad server data. Built for AdOps and Support Engineers.
 
 ---
 
@@ -10,7 +10,7 @@ An AI-powered internal tool for comparing publisher ad reports against internal 
 |------------|-------------------------------------|
 | Backend    | Python 3.11+ · FastAPI · Uvicorn   |
 | Frontend   | HTML · CSS · Vanilla JS            |
-| AI         | Google Gemini 2.5 Flash & Pro      |
+| AI         | Google Gemini (analysis/explanation)|
 | Data       | Elasticsearch (REST API)           |
 
 ---
@@ -21,7 +21,7 @@ An AI-powered internal tool for comparing publisher ad reports against internal 
 adops-discrepancy-tool/
 ├── backend/
 │   ├── main.py          # FastAPI app + routes
-│   ├── parser.py        # Gemini AI parsing logic
+│   ├── parser.py        # Deterministic report parsing (+ optional AI fallback)
 │   ├── elastic.py       # Elasticsearch queries
 │   ├── analysis.py      # Discrepancy calculations
 │   ├── ai_explainer.py  # Gemini explanation generation
@@ -94,7 +94,9 @@ Visit http://127.0.0.1:8000 in your browser, or open `frontend/index.html` direc
 
 ## Usage
 
-1. Paste a publisher report in the text area. Any format is accepted — unstructured text, CSV-like, tables, etc.
+1. Provide publisher data using one of two modes:
+  - Text mode: paste a publisher report in the text area (unstructured text, table text, CSV-like text, etc.)
+  - File mode: upload a structured publisher file (.xlsx/.csv) and inform the analysis date
 
    **Example input:**
    ```
@@ -113,10 +115,15 @@ Visit http://127.0.0.1:8000 in your browser, or open `frontend/index.html` direc
 3. Click **Analyze Report** (or press `Ctrl+Enter`).
 
 4. The system will:
-   - Extract metrics from the report using Gemini AI
+  - Extract metrics from the report using deterministic parsing (regex/table/date parsing)
    - Query Elasticsearch for the same period and publisher
    - Calculate discrepancy metrics
-   - Display a comparison table and AI-generated explanation
+  - Display a comparison table and AI-generated explanation
+
+By default, AI is used only for the final explanation text. The report parser runs locally.
+
+Optional parser fallback:
+- Set `GEMINI_PARSER_ENABLED=true` in `backend/.env` if you want Gemini to complement missing fields when deterministic extraction cannot find all required values.
 
 ---
 
@@ -140,6 +147,12 @@ The tool is designed to work with any ES schema. Configure field names in `.env`
 | `ES_PUBLISHER_FIELD`| `publisher`           | Publisher/domain field         |
 | `ES_SERVED_FIELD`   | `served_impressions`  | Served impressions metric      |
 | `ES_VIEWABLE_FIELD` | `viewable_impressions`| Viewable impressions metric    |
+| `ES_TIMEZONE`       | `Europe/Lisbon`       | Timezone used to interpret date filters |
+| `ES_PUBLISHER_MATCH_MODE` | `contains`       | Publisher matching mode: `contains` or `exact` |
+
+Notes for discrepancy alignment with Kibana:
+- Date filters are interpreted in `ES_TIMEZONE` and converted to UTC internally.
+- If you need strict parity with Kibana filters, set `ES_PUBLISHER_MATCH_MODE=exact` to avoid broader wildcard matches.
 
 ---
 
@@ -179,11 +192,27 @@ The tool is designed to work with any ES schema. Configure field names in `.env`
 ### `GET /health`
 Returns `{"status": "ok"}`.
 
+### `POST /analyze-file`
+Consumes multipart/form-data for structured report files.
+
+Required form fields:
+- `file`: .xlsx or .csv report exported from publisher/GAM
+- `start_date`: date string in `YYYY-MM-DD` (inclusive)
+- `end_date`: date string in `YYYY-MM-DD` (exclusive)
+
+Optional form fields:
+- `publisher`
+- `script_id`
+
+Date range behavior:
+- The backend uses `[start_date, end_date)` semantics (same style as Kibana absolute range with end at midnight).
+- Example: `start_date=2026-03-24` and `end_date=2026-03-25` includes exactly 24 hours of day 24.
+
 ---
 
-## Gemini Terminology Mapping
+## Parser Terminology Mapping
 
-The AI parser maps common publisher terms automatically:
+The deterministic parser maps common publisher terms automatically:
 
 | Treated As              | Accepted Labels                                   |
 |-------------------------|---------------------------------------------------|
@@ -202,5 +231,6 @@ The AI parser maps common publisher terms automatically:
 - Ensure VPN/WARP is connected if required.
 - Check ES field names match your actual schema.
 
-**`Failed to parse report with AI`**
-- Verify `GEMINI_API_KEY` is valid and has Gemini 1.5 Flash access.
+**`Failed to parse report`**
+- Ensure the report contains served impressions and a date range.
+- If using AI fallback parser, verify `GEMINI_API_KEY` is valid.

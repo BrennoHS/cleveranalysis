@@ -5,8 +5,10 @@ All index names and field names are configurable via environment variables.
 
 import os
 import httpx
+from datetime import datetime, time, timezone
 from dotenv import load_dotenv
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
@@ -26,25 +28,77 @@ ES_DATE_FIELD      = os.environ.get("ES_DATE_FIELD", "@timestamp")
 ES_PUBLISHER_FIELD = os.environ.get("ES_PUBLISHER_FIELD", "publisher")
 ES_SERVED_FIELD    = os.environ.get("ES_SERVED_FIELD", "served_impressions")
 ES_VIEWABLE_FIELD  = os.environ.get("ES_VIEWABLE_FIELD", "viewable_impressions")
+ES_TIMEZONE = os.environ.get("ES_TIMEZONE", "Europe/Lisbon").strip() or "Europe/Lisbon"
+ES_PUBLISHER_MATCH_MODE = os.environ.get("ES_PUBLISHER_MATCH_MODE", "contains").strip().lower()
+
+try:
+    ES_QUERY_TZ = ZoneInfo(ES_TIMEZONE)
+except Exception:
+    ES_QUERY_TZ = timezone.utc
+
+
+def _to_es_utc_timestamp(dt: datetime) -> str:
+    utc_dt = dt.astimezone(timezone.utc)
+    return utc_dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:23] + "Z"
+
+
+def _parse_range_input(value: str, is_end: bool) -> datetime:
+    raw = (value or "").strip()
+    if not raw:
+        raise ValueError("Date range value cannot be empty")
+
+    if "T" in raw:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ES_QUERY_TZ)
+        return dt
+
+    d = datetime.fromisoformat(raw)
+    # End of range is exclusive: date-only end means start of that day.
+    day_time = time(0, 0, 0, 0) if is_end else time(0, 0, 0, 0)
+    return datetime.combine(d.date(), day_time, ES_QUERY_TZ)
 
 
 def _to_utc_day_bounds(start_date: str, end_date: str) -> tuple[str, str]:
-    """Return inclusive UTC bounds for a date range."""
-    start = (start_date or "").strip()
-    end = (end_date or "").strip()
+    """Return UTC bounds with end-exclusive semantics [start, end)."""
+    start_dt = _parse_range_input(start_date, is_end=False)
+    end_dt = _parse_range_input(end_date, is_end=True)
 
-    # If caller already provides a datetime/timestamp, keep it.
-    if "T" in start:
-        gte = start
-    else:
-        gte = f"{start}T00:00:00.000Z"
+    return _to_es_utc_timestamp(start_dt), _to_es_utc_timestamp(end_dt)
 
-    if "T" in end:
-        lte = end
-    else:
-        lte = f"{end}T23:59:59.999Z"
 
-    return gte, lte
+def _build_script_id_filter(script_id: str) -> dict:
+    sid = script_id.strip()
+    should_clauses: list[dict] = [
+        {"term": {"script_id": sid}},
+        {"match": {"script_id": sid}},
+    ]
+    if sid.isdigit():
+        should_clauses.insert(1, {"term": {"script_id": int(sid)}})
+
+    return {
+        "bool": {
+            "should": should_clauses,
+            "minimum_should_match": 1,
+        }
+    }
+
+
+def _build_publisher_filter(publisher: str) -> dict:
+    pub = publisher.strip()
+    if ES_PUBLISHER_MATCH_MODE == "exact":
+        return {"term": {f"{ES_PUBLISHER_FIELD}.keyword": pub}}
+
+    return {
+        "bool": {
+            "should": [
+                {"term": {f"{ES_PUBLISHER_FIELD}.keyword": pub}},
+                {"wildcard": {f"{ES_PUBLISHER_FIELD}.keyword": f"*{pub}*"}},
+                {"match": {ES_PUBLISHER_FIELD: pub}},
+            ],
+            "minimum_should_match": 1,
+        }
+    }
 
 # HTTP client setup
 def _get_auth():
@@ -92,14 +146,14 @@ def _kibana_count_query(
     script_id: str | None,
     event_type: str | None = None,
 ) -> dict:
-    gte, lte = _to_utc_day_bounds(start_date, end_date)
+    gte, lt = _to_utc_day_bounds(start_date, end_date)
 
     filters: list[dict] = [
         {
             "range": {
                 ES_DATE_FIELD: {
                     "gte": gte,
-                    "lte": lte,
+                    "lt": lt,
                     "format": "strict_date_optional_time",
                 }
             }
@@ -109,24 +163,13 @@ def _kibana_count_query(
     if script_id:
         sid = script_id.strip()
         if sid:
-            filters.append({"match": {"script_id": sid}})
+            filters.append(_build_script_id_filter(sid))
     elif publisher:
         pub = publisher.strip()
         if pub.isdigit():
-            filters.append({"match": {"script_id": pub}})
+            filters.append(_build_script_id_filter(pub))
         else:
-            filters.append(
-                {
-                    "bool": {
-                        "should": [
-                            {"term": {f"{ES_PUBLISHER_FIELD}.keyword": pub}},
-                            {"wildcard": {f"{ES_PUBLISHER_FIELD}.keyword": f"*{pub}*"}},
-                            {"match": {ES_PUBLISHER_FIELD: pub}},
-                        ],
-                        "minimum_should_match": 1,
-                    }
-                }
-            )
+            filters.append(_build_publisher_filter(pub))
 
     if event_type:
         filters.append({"match_phrase": {"type_name": event_type}})
@@ -182,13 +225,13 @@ def _build_type_name_count_query(
     script_id: str | None,
     event_type: str,
 ) -> dict:
-    gte, lte = _to_utc_day_bounds(start_date, end_date)
+    gte, lt = _to_utc_day_bounds(start_date, end_date)
     must_clauses: list[dict] = [
         {
             "range": {
                 ES_DATE_FIELD: {
                     "gte": gte,
-                    "lte": lte,
+                    "lt": lt,
                     "format": "strict_date_optional_time",
                 }
             }
@@ -199,31 +242,9 @@ def _build_type_name_count_query(
     if script_id:
         sid = script_id.strip()
         if sid:
-            must_clauses.append(
-                {
-                    "bool": {
-                        "should": [
-                            {"term": {"script_id": sid}},
-                            {"term": {"script_id": int(sid)}} if sid.isdigit() else {"match": {"script_id": sid}},
-                            {"match": {"script_id": sid}},
-                        ],
-                        "minimum_should_match": 1,
-                    }
-                }
-            )
+            must_clauses.append(_build_script_id_filter(sid))
     elif publisher:
-        must_clauses.append(
-            {
-                "bool": {
-                    "should": [
-                        {"term": {f"{ES_PUBLISHER_FIELD}.keyword": publisher}},
-                        {"wildcard": {f"{ES_PUBLISHER_FIELD}.keyword": f"*{publisher}*"}},
-                        {"match": {ES_PUBLISHER_FIELD: publisher}},
-                    ],
-                    "minimum_should_match": 1,
-                }
-            }
-        )
+        must_clauses.append(_build_publisher_filter(publisher))
 
     return {
         "size": 0,
@@ -429,14 +450,14 @@ def build_advanced_query(
     Returns:
         Elasticsearch query dict
     """
-    gte, lte = _to_utc_day_bounds(start_date, end_date)
+    gte, lt = _to_utc_day_bounds(start_date, end_date)
 
     must_clauses = [
         {
             "range": {
                 ES_DATE_FIELD: {
                     "gte": gte,
-                    "lte": lte,
+                    "lt": lt,
                     "format": "strict_date_optional_time",
                 }
             }
@@ -476,14 +497,14 @@ def build_advanced_query(
 
 def _build_query(start_date: str, end_date: str, publisher: str | None, script_id: str | None) -> dict:
     """Build an Elasticsearch aggregation query."""
-    gte, lte = _to_utc_day_bounds(start_date, end_date)
+    gte, lt = _to_utc_day_bounds(start_date, end_date)
 
     must_clauses = [
         {
             "range": {
                 ES_DATE_FIELD: {
                     "gte": gte,
-                    "lte": lte,
+                    "lt": lt,
                     "format": "strict_date_optional_time",
                 }
             }
@@ -493,31 +514,9 @@ def _build_query(start_date: str, end_date: str, publisher: str | None, script_i
     if script_id:
         sid = script_id.strip()
         if sid:
-            must_clauses.append(
-                {
-                    "bool": {
-                        "should": [
-                            {"term": {"script_id": sid}},
-                            {"term": {"script_id": int(sid)}} if sid.isdigit() else {"match": {"script_id": sid}},
-                            {"match": {"script_id": sid}},
-                        ],
-                        "minimum_should_match": 1,
-                    }
-                }
-            )
+            must_clauses.append(_build_script_id_filter(sid))
     elif publisher:
-        must_clauses.append(
-            {
-                "bool": {
-                    "should": [
-                        {"term": {f"{ES_PUBLISHER_FIELD}.keyword": publisher}},
-                        {"wildcard": {f"{ES_PUBLISHER_FIELD}.keyword": f"*{publisher}*"}},
-                        {"match": {ES_PUBLISHER_FIELD: publisher}},
-                    ],
-                    "minimum_should_match": 1,
-                }
-            }
-        )
+        must_clauses.append(_build_publisher_filter(publisher))
 
     return {
         "size": 0,

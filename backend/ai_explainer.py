@@ -138,7 +138,13 @@ def generate_explanation(
         served = suspicious_analysis.get("served_analysis", {})
         viewable = suspicious_analysis.get("viewable_analysis", {})
         flags = suspicious_analysis.get("flags", [])
-        top_ips = metrics.get("top_10_ips", [])[:5]
+        top_ips = (
+            metrics.get("top_10_ips_merged")
+            or metrics.get("top_10_ips_served")
+            or metrics.get("top_10_ips_viewable")
+            or metrics.get("top_10_ips")
+            or []
+        )[:5]
         top_ip_text = ", ".join(f"{i.get('value')} ({i.get('count')})" for i in top_ips) if top_ips else "n/a"
         flags_text = "; ".join(flags) if flags else "nenhum gatilho crítico"
 

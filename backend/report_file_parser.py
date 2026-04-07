@@ -31,9 +31,32 @@ SERVED_HEADERS = {
 VIEWABLE_HEADERS = {
     "viewable impressions",
     "active view viewable impressions",
+    "ad server active view viewable impressions",
     "active views",
     "active view",
 }
+
+
+def _header_matches(header: str, candidates: set[str], kind: str) -> bool:
+    if header in candidates:
+        return True
+
+    # Tolerant matching for common vendor-specific labels.
+    if kind == "viewable":
+        if "viewable" in header and ("impression" in header or "impressions" in header):
+            return True
+        if "active view" in header and "impression" in header:
+            return True
+
+    if kind == "served":
+        if "impression" in header and any(token in header for token in ("served", "ad server", "measurable", "total")):
+            return True
+
+    if kind == "date":
+        if header in {"data", "reporting date"}:
+            return True
+
+    return False
 
 
 def _normalize_header(value: Any) -> str:
@@ -86,9 +109,9 @@ def _find_header_row(rows: list[list[Any]]) -> tuple[int, list[str]]:
         if not any(normalized):
             continue
 
-        has_date = any(cell in DATE_HEADERS for cell in normalized)
-        has_served = any(cell in SERVED_HEADERS for cell in normalized)
-        has_viewable = any(cell in VIEWABLE_HEADERS for cell in normalized)
+        has_date = any(_header_matches(cell, DATE_HEADERS, "date") for cell in normalized)
+        has_served = any(_header_matches(cell, SERVED_HEADERS, "served") for cell in normalized)
+        has_viewable = any(_header_matches(cell, VIEWABLE_HEADERS, "viewable") for cell in normalized)
         if has_date and (has_served or has_viewable):
             return idx, normalized
 
@@ -98,8 +121,16 @@ def _find_header_row(rows: list[list[Any]]) -> tuple[int, list[str]]:
 
 
 def _index_by_header(headers: list[str], candidates: set[str]) -> int | None:
+    kind = "generic"
+    if candidates is VIEWABLE_HEADERS:
+        kind = "viewable"
+    elif candidates is SERVED_HEADERS:
+        kind = "served"
+    elif candidates is DATE_HEADERS:
+        kind = "date"
+
     for idx, header in enumerate(headers):
-        if header in candidates:
+        if _header_matches(header, candidates, kind):
             return idx
     return None
 

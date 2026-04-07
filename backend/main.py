@@ -43,6 +43,8 @@ if os.path.exists(FRONTEND_DIR):
 
 class AnalyzeRequest(BaseModel):
     report_text: str
+    start_date: str
+    end_date: str
     publisher: str | None = None
     script_id: str | None = None
     suspicious_traffic: bool = False
@@ -105,11 +107,24 @@ def _run_analysis_pipeline(
     parsed: dict,
     publisher: str | None,
     script_id: str | None,
+    start_date_override: str,
+    end_date_override: str,
     suspicious_traffic: bool = False,
 ) -> AnalyzeResponse:
-    missing = [f for f in ("served_impressions", "start_date", "end_date") if not parsed.get(f)]
+    script_id_safe = (script_id or "").strip()
+    if not script_id_safe:
+        raise HTTPException(
+            status_code=422,
+            detail="Script ID é obrigatório para prosseguir com a análise."
+        )
+
+    effective = dict(parsed)
+    effective["start_date"] = start_date_override.strip()
+    effective["end_date"] = end_date_override.strip()
+
+    missing = [f for f in ("served_impressions", "start_date", "end_date") if not effective.get(f)]
     if missing:
-        extracted_fields = {k: v for k, v in parsed.items() if v is not None}
+        extracted_fields = {k: v for k, v in effective.items() if v is not None}
         raise HTTPException(
             status_code=422,
             detail=f"Could not extract required fields from report: {', '.join(missing)}. "
@@ -117,12 +132,12 @@ def _run_analysis_pipeline(
                    f"(Extracted: {extracted_fields if extracted_fields else 'nothing'})",
         )
 
-    pub_served = parsed["served_impressions"]
-    pub_viewable = parsed.get("viewable_impressions") or 0
-    start_date = parsed["start_date"]
-    end_date = parsed["end_date"]
+    pub_served = effective["served_impressions"]
+    pub_viewable = effective.get("viewable_impressions") or 0
+    start_date = effective["start_date"]
+    end_date = effective["end_date"]
     publisher_safe = publisher or ""
-    script_id_safe = (script_id or "").strip() or None
+    script_id_safe = script_id_safe or None
 
     try:
         index = get_available_indices()[0]
@@ -249,7 +264,14 @@ async def analyze(request: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse report: {str(e)}")
 
-    return _run_analysis_pipeline(parsed, request.publisher, request.script_id, request.suspicious_traffic)
+    return _run_analysis_pipeline(
+        parsed,
+        request.publisher,
+        request.script_id,
+        start_date_override=request.start_date,
+        end_date_override=request.end_date,
+        suspicious_traffic=request.suspicious_traffic,
+    )
 
 
 @app.post("/analyze-file", response_model=AnalyzeResponse)
@@ -273,4 +295,11 @@ async def analyze_file(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse uploaded report: {str(e)}")
 
-    return _run_analysis_pipeline(parsed, publisher, script_id, suspicious_traffic)
+    return _run_analysis_pipeline(
+        parsed,
+        publisher,
+        script_id,
+        start_date_override=start_date,
+        end_date_override=end_date,
+        suspicious_traffic=suspicious_traffic,
+    )

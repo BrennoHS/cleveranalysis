@@ -34,6 +34,7 @@ ES_VIEWABLE_FIELD  = os.environ.get("ES_VIEWABLE_FIELD", "viewable_impressions")
 ES_TIMEZONE = os.environ.get("ES_TIMEZONE", "Europe/Lisbon").strip() or "Europe/Lisbon"
 ES_PUBLISHER_MATCH_MODE = os.environ.get("ES_PUBLISHER_MATCH_MODE", "contains").strip().lower()
 ES_IP_FALLBACK_MAX_HITS = int(os.environ.get("ES_IP_FALLBACK_MAX_HITS", "8000"))
+ES_BEHAVIOR_MAX_HITS = int(os.environ.get("ES_BEHAVIOR_MAX_HITS", "8000"))
 
 try:
     ES_QUERY_TZ = ZoneInfo(ES_TIMEZONE)
@@ -1062,7 +1063,7 @@ def _parse_event_timestamp(raw: str | None) -> datetime | None:
         return None
 
 
-def _compute_avg_seconds_between_events_per_user(index: str, filters: list[dict], max_hits: int = 8000) -> float:
+def _fetch_behavior_hits(index: str, filters: list[dict], max_hits: int = 8000) -> list[dict]:
     query = {
         "size": max_hits,
         "track_total_hits": False,
@@ -1077,9 +1078,18 @@ def _compute_avg_seconds_between_events_per_user(index: str, filters: list[dict]
     }
     raw = _run_search_safe(index, query)
     if not raw:
-        return 0.0
+        return []
+    return raw.get("hits", {}).get("hits", [])
 
-    hits = raw.get("hits", {}).get("hits", [])
+
+def _compute_avg_seconds_between_events_per_user(
+    index: str,
+    filters: list[dict],
+    max_hits: int = 8000,
+    hits: list[dict] | None = None,
+) -> float:
+    if hits is None:
+        hits = _fetch_behavior_hits(index, filters, max_hits=max_hits)
     if not hits:
         return 0.0
 
@@ -1107,32 +1117,14 @@ def _compute_avg_seconds_between_events_per_user(index: str, filters: list[dict]
     return round(sum(deltas) / len(deltas), 3)
 
 
-def _compute_daily_user_volume_signals(index: str, filters: list[dict], max_hits: int = 8000) -> dict:
-    query = {
-        "size": max_hits,
-        "track_total_hits": False,
-        "_source": [
-            "source", "client", "network", "request",
-            "source.ip", "source_ip", "ip",
-            "client.ip", "client_ip", "network.client.ip", "request.ip",
-            ES_DATE_FIELD,
-        ],
-        "query": {"bool": {"filter": filters}},
-        "sort": [{ES_DATE_FIELD: {"order": "asc"}}],
-    }
-    raw = _run_search_safe(index, query)
-    if not raw:
-        return {
-            "records_over_20": 0,
-            "records_over_50": 0,
-            "records_over_100": 0,
-            "repeat_users_over_20_days": 0,
-            "repeat_users_over_50_days": 0,
-            "max_events_single_user_day": 0,
-            "weighted_excess": 0,
-        }
-
-    hits = raw.get("hits", {}).get("hits", [])
+def _compute_daily_user_volume_signals(
+    index: str,
+    filters: list[dict],
+    max_hits: int = 8000,
+    hits: list[dict] | None = None,
+) -> dict:
+    if hits is None:
+        hits = _fetch_behavior_hits(index, filters, max_hits=max_hits)
     if not hits:
         return {
             "records_over_20": 0,
@@ -1441,10 +1433,12 @@ def analyze_suspicious_traffic(
         ("ua_original", "user_agent.original", 10),
     ]
     served_card_specs = [
+        ("unique_ip", "source.ip"),
         ("unique_resolution", "os.resolution"),
         ("unique_region", "geo.region_code"),
     ]
     viewable_card_specs = [
+        ("unique_ip", "source.ip"),
         ("unique_resolution", "os.resolution"),
         ("unique_region", "geo.region_code"),
     ]
@@ -1509,8 +1503,8 @@ def analyze_suspicious_traffic(
     suspicious_ua_pattern = re.compile(r"bot|crawler|spider|headless|phantom|selenium|python|curl|wget|scrapy", re.IGNORECASE)
     suspicious_ua_count = sum(item["count"] for item in ua_merged if suspicious_ua_pattern.search(item["value"] or ""))
 
-    unique_ip_served = _fetch_unique_count(served_index, served_filters, "source.ip")
-    unique_ip_viewable = _fetch_unique_count(viewable_index, viewable_filters, "source.ip")
+    unique_ip_served = _cardinality_with_fallback(served_aggs_raw, "unique_ip", served_index, served_filters, "source.ip")
+    unique_ip_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_ip", viewable_index, viewable_filters, "source.ip")
     if unique_ip_served == 0 and served_unique_ip_from_hits > 0:
         unique_ip_served = served_unique_ip_from_hits
     if unique_ip_served == 0 and served_ip_top:
@@ -1542,8 +1536,21 @@ def analyze_suspicious_traffic(
     viewable_avg_events_per_user = round(viewable_docs / max(unique_ip_viewable, 1), 2)
     served_avg_seconds_per_event = round(window_seconds / max(served_docs, 1), 3)
     viewable_avg_seconds_per_event = round(window_seconds / max(viewable_docs, 1), 3)
-    served_avg_seconds_per_user_event = _compute_avg_seconds_between_events_per_user(served_index, served_filters)
-    viewable_avg_seconds_per_user_event = _compute_avg_seconds_between_events_per_user(viewable_index, viewable_filters)
+    served_behavior_hits = _fetch_behavior_hits(served_index, served_filters, max_hits=ES_BEHAVIOR_MAX_HITS)
+    viewable_behavior_hits = _fetch_behavior_hits(viewable_index, viewable_filters, max_hits=ES_BEHAVIOR_MAX_HITS)
+
+    served_avg_seconds_per_user_event = _compute_avg_seconds_between_events_per_user(
+        served_index,
+        served_filters,
+        max_hits=ES_BEHAVIOR_MAX_HITS,
+        hits=served_behavior_hits,
+    )
+    viewable_avg_seconds_per_user_event = _compute_avg_seconds_between_events_per_user(
+        viewable_index,
+        viewable_filters,
+        max_hits=ES_BEHAVIOR_MAX_HITS,
+        hits=viewable_behavior_hits,
+    )
     uniformity_cv = _compute_uniformity_score(combined_histogram)
 
     viewable_adjusted = viewable_impressions + garbage_impressions
@@ -1558,8 +1565,18 @@ def analyze_suspicious_traffic(
     served_ip_repetition_pct = _percent(max(served_docs - unique_ip_served, 0), served_docs) if served_ip_metrics_available else 0.0
     viewable_ip_repetition_pct = _percent(max(viewable_docs - unique_ip_viewable, 0), viewable_docs) if viewable_ip_metrics_available else 0.0
 
-    served_daily_user_volume = _compute_daily_user_volume_signals(served_index, served_filters)
-    viewable_daily_user_volume = _compute_daily_user_volume_signals(viewable_index, viewable_filters)
+    served_daily_user_volume = _compute_daily_user_volume_signals(
+        served_index,
+        served_filters,
+        max_hits=ES_BEHAVIOR_MAX_HITS,
+        hits=served_behavior_hits,
+    )
+    viewable_daily_user_volume = _compute_daily_user_volume_signals(
+        viewable_index,
+        viewable_filters,
+        max_hits=ES_BEHAVIOR_MAX_HITS,
+        hits=viewable_behavior_hits,
+    )
     served_max_events_single_user_day_exact = _compute_max_events_single_user_day(served_index, served_filters)
     viewable_max_events_single_user_day_exact = _compute_max_events_single_user_day(viewable_index, viewable_filters)
     if served_max_events_single_user_day_exact > 0:
@@ -1606,6 +1623,7 @@ def analyze_suspicious_traffic(
     strongest_top10_ip_pct = max(available_top10_candidates) if available_top10_candidates else 0.0
     strongest_same_ip_pct = max(available_same_ip_candidates) if available_same_ip_candidates else 0.0
     strongest_ip_repetition_pct = max(available_ip_repetition_candidates) if available_ip_repetition_candidates else 0.0
+    min_avg_seconds_per_event = min(served_avg_seconds_per_event, viewable_avg_seconds_per_event)
 
     if strongest_top10_ip_pct >= 95:
         score += 20
@@ -1708,13 +1726,13 @@ def analyze_suspicious_traffic(
     if ip_diversity_pct >= 60 and (strongest_user_event_gap > 0 and strongest_user_event_gap < 2.5):
         score += 18
         flags.append("Padrão distribuído: muitos IPs com cadência curta")
-    elif ip_diversity_pct >= 45 and min(served_avg_seconds_per_event, viewable_avg_seconds_per_event) < 2.0:
+    elif ip_diversity_pct >= 45 and min_avg_seconds_per_event < 2.0:
         score += 10
 
-    if min(served_avg_seconds_per_event, viewable_avg_seconds_per_event) < 1.0:
+    if min_avg_seconds_per_event < 1.0:
         score += 15
         flags.append("Cadência de eventos rápida demais para tráfego orgânico")
-    elif min(served_avg_seconds_per_event, viewable_avg_seconds_per_event) < 2.0:
+    elif min_avg_seconds_per_event < 2.0:
         score += 8
 
     if uniformity_cv > 0 and uniformity_cv < 0.35:

@@ -833,6 +833,24 @@
           <div id="text-mode-panel" class="form-group">
             <label>Relatório em texto</label>
             <textarea id="report-text" placeholder="Cole aqui o relatório do publisher..."></textarea>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Data inicial (inclusiva)</label>
+                <input type="date" id="text-start-date" />
+              </div>
+              <div class="form-group">
+                <label>Data final (exclusiva)</label>
+                <input type="date" id="text-end-date" />
+              </div>
+            </div>
+
+            <div class="quick-range" role="group" aria-label="Atalhos de período no modo texto">
+              <button type="button" id="text-range-yesterday">Ontem</button>
+              <button type="button" id="text-range-today">Hoje</button>
+              <button type="button" id="text-range-last7">Últimos 7 dias</button>
+              <button type="button" id="text-range-last30">Últimos 30 dias</button>
+            </div>
           </div>
 
           <div id="file-mode-panel" class="hidden">
@@ -1051,12 +1069,6 @@
       return `${sign}${num.toLocaleString('en-US')}`;
     }
 
-    function formatGap(pp) {
-      if (pp == null || pp === '—') return '—';
-      const sign = pp >= 0 ? '+' : '';
-      return `${sign}${Number(pp).toFixed(2)} pp`;
-    }
-
     function showError(msg) {
       const el = document.getElementById('error-msg');
       el.textContent = msg;
@@ -1093,38 +1105,40 @@
       return `${year}-${month}-${day}`;
     }
 
-    function setExclusiveRange(startDate, endDate) {
-      document.getElementById('analysis-start-date').value = toIsoDate(startDate);
-      document.getElementById('analysis-end-date').value = toIsoDate(endDate);
-      setInputMode('file');
+    function setExclusiveRange(startDate, endDate, mode = 'file') {
+      const startId = mode === 'text' ? 'text-start-date' : 'analysis-start-date';
+      const endId = mode === 'text' ? 'text-end-date' : 'analysis-end-date';
+      document.getElementById(startId).value = toIsoDate(startDate);
+      document.getElementById(endId).value = toIsoDate(endDate);
+      setInputMode(mode);
     }
 
-    function applyRangePreset(preset) {
+    function applyRangePreset(preset, mode = 'file') {
       const today = new Date();
       const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const end = new Date(start);
 
       if (preset === 'today') {
         end.setDate(end.getDate() + 1);
-        setExclusiveRange(start, end);
+        setExclusiveRange(start, end, mode);
         return;
       }
 
       if (preset === 'yesterday') {
         start.setDate(start.getDate() - 1);
-        setExclusiveRange(start, end);
+        setExclusiveRange(start, end, mode);
         return;
       }
 
       if (preset === 'last7') {
         start.setDate(start.getDate() - 7);
-        setExclusiveRange(start, end);
+        setExclusiveRange(start, end, mode);
         return;
       }
 
       if (preset === 'last30') {
         start.setDate(start.getDate() - 30);
-        setExclusiveRange(start, end);
+        setExclusiveRange(start, end, mode);
       }
     }
 
@@ -1164,13 +1178,6 @@
       } else {
         badge.classList.add('status-alert');
       }
-    }
-
-    function getDiscrepancyClass(pp) {
-      const abs = Math.abs(pp);
-      if (abs < 10) return 'positive';
-      if (abs <= 25) return 'negative';
-      return 'high';
     }
 
     function getSignedCountClass(value) {
@@ -1341,12 +1348,29 @@
       const reportFile = document.getElementById('report-file').files[0] || null;
       const analysisStartDate = document.getElementById('analysis-start-date').value;
       const analysisEndDate = document.getElementById('analysis-end-date').value;
+      const textStartDate = document.getElementById('text-start-date').value;
+      const textEndDate = document.getElementById('text-end-date').value;
       const scriptId = document.getElementById('script-id').value.trim();
       const suspiciousTraffic = document.getElementById('suspicious-traffic').checked;
       const isFileMode = document.getElementById('mode-file').classList.contains('active');
 
+      if (!scriptId) {
+        showError('Script ID é obrigatório para prosseguir com a análise.');
+        return;
+      }
+
       if (!isFileMode && !reportText) {
         showError('Cole um relatório em texto para analisar neste modo.');
+        return;
+      }
+
+      if (!isFileMode && (!textStartDate || !textEndDate)) {
+        showError('No modo texto, informe data inicial e data final para consultar a Clever.');
+        return;
+      }
+
+      if (!isFileMode && textStartDate && textEndDate && textStartDate >= textEndDate) {
+        showError('A data inicial deve ser menor que a data final (final é exclusiva).');
         return;
       }
 
@@ -1378,7 +1402,7 @@
           formData.append('file', reportFile);
           formData.append('start_date', analysisStartDate);
           formData.append('end_date', analysisEndDate);
-          if (scriptId) formData.append('script_id', scriptId);
+          formData.append('script_id', scriptId);
           formData.append('suspicious_traffic', suspiciousTraffic ? 'true' : 'false');
 
           response = await fetch(`${API_BASE}/analyze-file`, {
@@ -1391,7 +1415,9 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               report_text: reportText,
-              script_id: scriptId || null,
+              start_date: textStartDate || null,
+              end_date: textEndDate || null,
+              script_id: scriptId,
               suspicious_traffic: suspiciousTraffic,
             }),
           });
@@ -1422,13 +1448,20 @@
     document.getElementById('mode-text').addEventListener('click', () => setInputMode('text'));
     document.getElementById('mode-file').addEventListener('click', () => setInputMode('file'));
 
-    document.getElementById('range-yesterday').addEventListener('click', () => applyRangePreset('yesterday'));
-    document.getElementById('range-today').addEventListener('click', () => applyRangePreset('today'));
-    document.getElementById('range-last7').addEventListener('click', () => applyRangePreset('last7'));
-    document.getElementById('range-last30').addEventListener('click', () => applyRangePreset('last30'));
+    document.getElementById('range-yesterday').addEventListener('click', () => applyRangePreset('yesterday', 'file'));
+    document.getElementById('range-today').addEventListener('click', () => applyRangePreset('today', 'file'));
+    document.getElementById('range-last7').addEventListener('click', () => applyRangePreset('last7', 'file'));
+    document.getElementById('range-last30').addEventListener('click', () => applyRangePreset('last30', 'file'));
+
+    document.getElementById('text-range-yesterday').addEventListener('click', () => applyRangePreset('yesterday', 'text'));
+    document.getElementById('text-range-today').addEventListener('click', () => applyRangePreset('today', 'text'));
+    document.getElementById('text-range-last7').addEventListener('click', () => applyRangePreset('last7', 'text'));
+    document.getElementById('text-range-last30').addEventListener('click', () => applyRangePreset('last30', 'text'));
 
     // Default mode
     setInputMode('text');
+    enableDateCalendarAssist('text-start-date');
+    enableDateCalendarAssist('text-end-date');
     enableDateCalendarAssist('analysis-start-date');
     enableDateCalendarAssist('analysis-end-date');
 

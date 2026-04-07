@@ -8,6 +8,7 @@ import re
 import json
 import ipaddress
 import httpx
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time, timezone
 from dotenv import load_dotenv
 from typing import Optional
@@ -678,6 +679,22 @@ def _run_msearch_safe(requests: list[tuple[str, dict]]) -> list[dict | None] | N
         return None
 
 
+def _run_searches_parallel(requests: list[tuple[str, dict]]) -> list[dict | None]:
+    """
+    Run multiple searches in parallel when msearch is unavailable.
+    Preserves request order and avoids serial latency.
+    """
+    if not requests:
+        return []
+
+    results: list[dict | None] = [None] * len(requests)
+    with ThreadPoolExecutor(max_workers=min(len(requests), 8)) as executor:
+        futures = [executor.submit(_run_search_safe, index, body) for index, body in requests]
+        for idx, future in enumerate(futures):
+            results[idx] = future.result()
+    return results
+
+
 def _extract_terms(raw: dict, agg_name: str, total_docs: int) -> list[dict]:
     buckets = raw.get("aggregations", {}).get(agg_name, {}).get("buckets", [])
     values: list[dict] = []
@@ -985,7 +1002,31 @@ def _fetch_unique_count(index: str, filters: list[dict], field: str) -> int:
     return last_value
 
 
-def _compute_max_events_single_user_day(index: str, filters: list[dict], field: str = "source.ip") -> int:
+def _compute_max_events_single_user_day_from_hits(
+    hits: list[dict],
+) -> int:
+    """
+    Compute max events for a single user in a single day from pre-fetched hits.
+    Eliminates redundant ES query with nested date_histogram aggregation.
+    """
+    if not hits:
+        return 0
+    
+    by_user_day: dict[tuple[str, str], int] = {}
+    for hit in hits:
+        src = hit.get("_source", {})
+        ip = _extract_source_ip(src)
+        ts = _parse_event_timestamp(src.get(ES_DATE_FIELD))
+        if not ip or ts is None:
+            continue
+        day_key = ts.date().isoformat()
+        key = (str(ip), day_key)
+        by_user_day[key] = by_user_day.get(key, 0) + 1
+    
+    if not by_user_day:
+        return 0
+    
+    return max(by_user_day.values())
     candidates: list[str] = []
     primary = _agg_field_for_terms(field)
     candidates.append(primary)
@@ -1339,6 +1380,42 @@ def _top_n_pct(items: list[dict], total: int, n: int) -> float:
     return _percent(top_sum, total)
 
 
+def _compute_ip_metrics_from_local_hits(
+    hits: list[dict],
+    total_docs: int,
+) -> tuple[list[dict], int]:
+    """
+    Compute top IPs and unique count directly from pre-fetched hits.
+    Eliminates redundant ES query when behavior hits are already fetched.
+    """
+    if not hits:
+        return [], 0
+
+    counts: dict[str, int] = {}
+    for hit in hits:
+        src = hit.get("_source", {})
+        ip = _extract_source_ip(src)
+        if not ip:
+            continue
+        counts[ip] = counts.get(ip, 0) + 1
+
+    if not counts:
+        return [], 0
+
+    ordered = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    unique_count = len(counts)
+    
+    top10 = [
+        {
+            "value": ip,
+            "count": cnt,
+            "percent": round((cnt / total_docs * 100) if total_docs > 0 else 0.0, 2),
+        }
+        for ip, cnt in ordered[:10]
+    ]
+    return top10, unique_count
+
+
 def analyze_suspicious_traffic(
     start_date: str,
     end_date: str,
@@ -1351,6 +1428,9 @@ def analyze_suspicious_traffic(
     """
     Deterministic suspicious-traffic analysis using served-impressions for Served and
     core-view-events for Viewable/Garbage behavior.
+    
+    Optimized: Fetches behavior hits upfront in parallel, reusing them for IP metrics
+    and cadence calculations to eliminate redundant ES queries.
     """
     indices = get_available_indices()
     served_index = next((i for i in indices if "served-impressions" in i or "served" in i), indices[0])
@@ -1370,49 +1450,6 @@ def analyze_suspicious_traffic(
         script_id,
         event_types=["viewable_impression", "garbage"],
     )
-
-    served_count_raw = _run_search_safe(
-        served_index,
-        {
-            "size": 0,
-            "track_total_hits": True,
-            "query": {"bool": {"filter": served_filters}},
-        },
-    )
-    viewable_count_raw = _run_search_safe(
-        viewable_index,
-        {
-            "size": 0,
-            "track_total_hits": True,
-            "query": {"bool": {"filter": viewable_filters}},
-        },
-    )
-
-    if served_count_raw is None and viewable_count_raw is None:
-        raise RuntimeError("All suspicious-analysis queries failed due to Elasticsearch/Kibana 400 errors")
-
-    served_docs = _extract_total_hits(served_count_raw or {})
-    viewable_docs = _extract_total_hits(viewable_count_raw or {})
-
-    total_docs = served_docs + viewable_docs
-
-    served_ip_top_raw = _fetch_terms_distribution(served_index, served_filters, "source.ip", served_docs, size=500)
-    viewable_ip_top_raw = _fetch_terms_distribution(viewable_index, viewable_filters, "source.ip", viewable_docs, size=500)
-    served_ip_top = _filter_valid_ip_buckets(served_ip_top_raw)
-    viewable_ip_top = _filter_valid_ip_buckets(viewable_ip_top_raw)
-    
-    served_ip_extraction_mode = "aggregation"
-    served_unique_ip_from_hits = 0
-    if served_docs > 0 and not served_ip_top:
-        served_ip_top, served_unique_ip_from_hits = _compute_ip_metrics_from_hits(
-            served_index,
-            served_filters,
-            served_docs,
-            max_hits=ES_IP_FALLBACK_MAX_HITS,
-        )
-        served_ip_extraction_mode = "fallback_hits"
-    
-    viewable_ip_extraction_mode = "aggregation"
 
     served_term_specs = [
         ("country", "geo.country_code", 10),
@@ -1443,22 +1480,83 @@ def analyze_suspicious_traffic(
         ("unique_region", "geo.region_code"),
     ]
 
+    served_behavior_query = {
+        "size": ES_BEHAVIOR_MAX_HITS,
+        "track_total_hits": False,
+        "_source": [
+            "source", "client", "network", "request",
+            "source.ip", "source_ip", "ip",
+            "client.ip", "client_ip", "network.client.ip", "request.ip",
+            ES_DATE_FIELD,
+        ],
+        "query": {"bool": {"filter": served_filters}},
+        "sort": [{ES_DATE_FIELD: {"order": "asc"}}],
+    }
+    viewable_behavior_query = {
+        "size": ES_BEHAVIOR_MAX_HITS,
+        "track_total_hits": False,
+        "_source": [
+            "source", "client", "network", "request",
+            "source.ip", "source_ip", "ip",
+            "client.ip", "client_ip", "network.client.ip", "request.ip",
+            ES_DATE_FIELD,
+        ],
+        "query": {"bool": {"filter": viewable_filters}},
+        "sort": [{ES_DATE_FIELD: {"order": "asc"}}],
+    }
+
     served_consolidated_query = _build_consolidated_aggs_query(served_filters, served_term_specs, served_card_specs, include_histogram=True)
     viewable_consolidated_query = _build_consolidated_aggs_query(viewable_filters, viewable_term_specs, viewable_card_specs, include_histogram=True)
 
-    served_aggs_raw: dict = {}
-    viewable_aggs_raw: dict = {}
-    msearch_responses = _run_msearch_safe([
+    bundle_responses = _run_msearch_safe([
+        (served_index, served_behavior_query),
+        (viewable_index, viewable_behavior_query),
         (served_index, served_consolidated_query),
         (viewable_index, viewable_consolidated_query),
     ])
-    if msearch_responses and len(msearch_responses) >= 2:
-        served_aggs_raw = msearch_responses[0] or {}
-        viewable_aggs_raw = msearch_responses[1] or {}
-    if not served_aggs_raw:
-        served_aggs_raw = _run_search_safe(served_index, served_consolidated_query) or {}
-    if not viewable_aggs_raw:
-        viewable_aggs_raw = _run_search_safe(viewable_index, viewable_consolidated_query) or {}
+    if bundle_responses is None:
+        bundle_responses = _run_searches_parallel([
+            (served_index, served_behavior_query),
+            (viewable_index, viewable_behavior_query),
+            (served_index, served_consolidated_query),
+            (viewable_index, viewable_consolidated_query),
+        ])
+
+    if not bundle_responses or len(bundle_responses) < 4:
+        raise RuntimeError("All suspicious-analysis queries failed due to Elasticsearch/Kibana 400 errors")
+
+    served_behavior_raw = bundle_responses[0] or {}
+    viewable_behavior_raw = bundle_responses[1] or {}
+    served_aggs_raw = bundle_responses[2] or {}
+    viewable_aggs_raw = bundle_responses[3] or {}
+
+    served_docs = _extract_total_hits(served_aggs_raw)
+    viewable_docs = _extract_total_hits(viewable_aggs_raw)
+    total_docs = served_docs + viewable_docs
+
+    served_behavior_hits = served_behavior_raw.get("hits", {}).get("hits", []) if served_behavior_raw else []
+    viewable_behavior_hits = viewable_behavior_raw.get("hits", {}).get("hits", []) if viewable_behavior_raw else []
+
+    # Compute IP metrics from pre-fetched hits; fall back to aggregation if needed.
+    served_ip_top, served_unique_ip_count = _compute_ip_metrics_from_local_hits(served_behavior_hits, served_docs)
+    viewable_ip_top, viewable_unique_ip_count = _compute_ip_metrics_from_local_hits(viewable_behavior_hits, viewable_docs)
+
+    served_ip_extraction_mode = "behavior_hits"
+    served_unique_ip_from_hits = served_unique_ip_count
+
+    if served_docs > 0 and not served_ip_top:
+        served_ip_top_raw = _fetch_terms_distribution(served_index, served_filters, "source.ip", served_docs, size=500)
+        served_ip_top = _filter_valid_ip_buckets(served_ip_top_raw)
+        served_ip_extraction_mode = "aggregation_fallback"
+
+    viewable_ip_extraction_mode = "behavior_hits"
+    if viewable_docs > 0 and not viewable_ip_top:
+        viewable_ip_top_raw = _fetch_terms_distribution(viewable_index, viewable_filters, "source.ip", viewable_docs, size=500)
+        viewable_ip_top = _filter_valid_ip_buckets(viewable_ip_top_raw)
+        viewable_ip_extraction_mode = "aggregation_fallback"
+
+    served_aggs_raw = served_aggs_raw or {}
+    viewable_aggs_raw = viewable_aggs_raw or {}
 
     def _terms_with_fallback(raw: dict, agg_name: str, index: str, filters: list[dict], field: str, total: int, size: int = 10) -> list[dict]:
         terms = _extract_terms_from_agg(raw, agg_name, total)
@@ -1505,11 +1603,16 @@ def analyze_suspicious_traffic(
 
     unique_ip_served = _cardinality_with_fallback(served_aggs_raw, "unique_ip", served_index, served_filters, "source.ip")
     unique_ip_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_ip", viewable_index, viewable_filters, "source.ip")
-    if unique_ip_served == 0 and served_unique_ip_from_hits > 0:
-        unique_ip_served = served_unique_ip_from_hits
-    if unique_ip_served == 0 and served_ip_top:
+    
+    # Prefer counts from pre-fetched behavior hits (more reliable from actual data)
+    if served_unique_ip_count > 0:
+        unique_ip_served = served_unique_ip_count
+    elif unique_ip_served == 0 and served_ip_top:
         unique_ip_served = len({str(item.get("value", "")).strip() for item in served_ip_top if str(item.get("value", "")).strip()})
-    if unique_ip_viewable == 0 and viewable_ip_top:
+    
+    if viewable_unique_ip_count > 0:
+        unique_ip_viewable = viewable_unique_ip_count
+    elif unique_ip_viewable == 0 and viewable_ip_top:
         unique_ip_viewable = len({str(item.get("value", "")).strip() for item in viewable_ip_top if str(item.get("value", "")).strip()})
     unique_resolution_served = _cardinality_with_fallback(served_aggs_raw, "unique_resolution", served_index, served_filters, "os.resolution")
     unique_resolution_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_resolution", viewable_index, viewable_filters, "os.resolution")
@@ -1532,13 +1635,12 @@ def analyze_suspicious_traffic(
     end_dt = _parse_range_input(end_date, is_end=True)
     window_seconds = max(int((end_dt - start_dt).total_seconds()), 1)
 
-    served_avg_events_per_user = round(served_docs / max(unique_ip_served, 1), 2)
-    viewable_avg_events_per_user = round(viewable_docs / max(unique_ip_viewable, 1), 2)
+    served_avg_events_per_user = round(served_docs / max(served_unique_ip_count, 1), 2)
+    viewable_avg_events_per_user = round(viewable_docs / max(viewable_unique_ip_count, 1), 2)
     served_avg_seconds_per_event = round(window_seconds / max(served_docs, 1), 3)
     viewable_avg_seconds_per_event = round(window_seconds / max(viewable_docs, 1), 3)
-    served_behavior_hits = _fetch_behavior_hits(served_index, served_filters, max_hits=ES_BEHAVIOR_MAX_HITS)
-    viewable_behavior_hits = _fetch_behavior_hits(viewable_index, viewable_filters, max_hits=ES_BEHAVIOR_MAX_HITS)
-
+    
+    # Behavior hits already fetched upfront; reuse them for all cadence/volume metrics
     served_avg_seconds_per_user_event = _compute_avg_seconds_between_events_per_user(
         served_index,
         served_filters,
@@ -1577,8 +1679,10 @@ def analyze_suspicious_traffic(
         max_hits=ES_BEHAVIOR_MAX_HITS,
         hits=viewable_behavior_hits,
     )
-    served_max_events_single_user_day_exact = _compute_max_events_single_user_day(served_index, served_filters)
-    viewable_max_events_single_user_day_exact = _compute_max_events_single_user_day(viewable_index, viewable_filters)
+    
+    # Optimize: Compute max events per day from pre-fetched hits (no ES query needed)
+    served_max_events_single_user_day_exact = _compute_max_events_single_user_day_from_hits(served_behavior_hits)
+    viewable_max_events_single_user_day_exact = _compute_max_events_single_user_day_from_hits(viewable_behavior_hits)
     if served_max_events_single_user_day_exact > 0:
         served_daily_user_volume["max_events_single_user_day"] = served_max_events_single_user_day_exact
     if viewable_max_events_single_user_day_exact > 0:

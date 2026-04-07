@@ -28,7 +28,7 @@ class DiscrepancyResult:
     viewability_diff_pct: float   # relative % difference
 
     # Classification
-    status: str                   # "Normal" | "Attention" | "High Discrepancy"
+    status: str                   # "Baixa discrepância" | "Atenção na discrepância" | "Alta discrepância"
 
 
 def _safe_rate(viewable: int, served: int) -> float:
@@ -38,15 +38,13 @@ def _safe_rate(viewable: int, served: int) -> float:
     return viewable / served
 
 
-def _classify(viewability_diff_pp: float) -> str:
-    """Classify discrepancy based on absolute viewability difference in percentage points."""
-    abs_diff = abs(viewability_diff_pp)
-    if abs_diff < 15:
-        return "Normal"
-    elif abs_diff <= 25:
-        return "Attention"
-    else:
-        return "High Discrepancy"
+def _classify(discrepancy_pct: float) -> str:
+    """Classify discrepancy by percentage bands."""
+    if discrepancy_pct < 15:
+        return "Baixa discrepância"
+    if discrepancy_pct <= 30:
+        return "Atenção na discrepância"
+    return "Alta discrepância"
 
 
 def _discrepancy_pct(a: float, b: float) -> float:
@@ -82,7 +80,7 @@ def calculate_discrepancy(
 
     viewability_diff_pct = _discrepancy_pct(pub_viewability * 100, clever_viewability * 100)
 
-    status = _classify(viewability_diff_pp)
+    status = _classify(viewable_discrepancy_pct)
 
     return DiscrepancyResult(
         pub_served=pub_served,

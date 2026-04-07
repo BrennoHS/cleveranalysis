@@ -919,7 +919,7 @@
             <div class="results-publisher" id="res-publisher">—</div>
           </div>
           <div class="status-badge" id="res-badge">
-            Normal
+            Baixa discrepância
           </div>
         </div>
 
@@ -1160,20 +1160,26 @@
     function setStatus(status) {
       const badge = document.getElementById('res-badge');
       
-      // Translate status to Portuguese
       const statusMap = {
-        'Normal': 'Normal',
-        'Attention': 'Atenção',
-        'Alert': 'Alerta'
+        'Baixa discrepância': 'Baixa discrepância',
+        'Atenção na discrepância': 'Atenção na discrepância',
+        'Alta discrepância': 'Alta discrepância',
+        'Verde': 'Baixa discrepância',
+        'Amarelo': 'Atenção na discrepância',
+        'Vermelho': 'Alta discrepância',
+        'Normal': 'Baixa discrepância',
+        'Attention': 'Atenção na discrepância',
+        'High Discrepancy': 'Alta discrepância',
+        'Alert': 'Alta discrepância'
       };
       
       const displayStatus = statusMap[status] || status;
       badge.textContent = displayStatus;
       badge.className = 'status-badge';
 
-      if (status === 'Normal') {
+      if (displayStatus === 'Baixa discrepância') {
         badge.classList.add('status-normal');
-      } else if (status === 'Attention') {
+      } else if (displayStatus === 'Atenção na discrepância') {
         badge.classList.add('status-warning');
       } else {
         badge.classList.add('status-alert');

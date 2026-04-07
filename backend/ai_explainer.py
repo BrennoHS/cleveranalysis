@@ -43,10 +43,7 @@ Dados Clever (Interno):
 - Taxa de Visualização: {clever_viewability:.1f}%
 
 Métricas de Discrepância:
-- Diferença em Impressões Servidas: {diff_served:,}
-- Diferença em Impressões Visualizáveis: {diff_viewable:,}
-- Diferença de Visualização: {viewability_diff_pp:+.1f} pontos percentuais
-- Status: {status}
+ Status da discrepância: {status} (baixa discrepância / atenção na discrepância / alta discrepância)
 
 Período: {start_date} a {end_date}
 Publisher / Domínio: {publisher}

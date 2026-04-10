@@ -265,6 +265,7 @@
     .btn {
       width: 100%;
       height: 42px;
+      min-height: 42px;
       border: none;
       border-radius: 12px;
       background: var(--white);
@@ -276,6 +277,13 @@
       cursor: pointer;
       transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
       box-shadow: 0 10px 30px rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
 
     .btn:hover:not(:disabled) {
@@ -288,24 +296,85 @@
       cursor: not-allowed;
     }
 
-    .loading-state {
+    .btn-label { display: inline; }
+
+    .btn-spinner {
+      width: 18px;
+      height: 18px;
+      background: conic-gradient(
+        from 0deg,
+        #090909 0deg,
+        #090909 55deg,
+        rgba(9, 9, 9, 0.35) 260deg,
+        rgba(9, 9, 9, 0.15) 360deg
+      );
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.6px), #000 0);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 2.6px), #000 0);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
       display: none;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 10px 4px;
-      color: var(--text-soft);
+      position: absolute;
+      left: calc(50% - 9px);
+      top: calc(50% - 9px);
+      will-change: transform;
     }
 
-    .loading-state.active { display: flex; }
+    .btn.loading .btn-label {
+      visibility: hidden;
+    }
 
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-top-color: var(--white);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .btn.loading .btn-spinner {
+      display: inline-block;
+    }
+
+    .btn.loading,
+    .btn.loading:disabled {
+      opacity: 1;
+      transform: none;
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.12);
+      cursor: progress;
+    }
+
+    .analysis-progress {
+      display: none;
+      position: absolute;
+      top: 6px;
+      left: 0;
+      right: 4px;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .analysis-progress.active {
+      display: block;
+    }
+
+    .analysis-progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+    }
+
+    .analysis-progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #d9d9d9 0%, #ffffff 100%);
+      transition: width .35s ease;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+    }
+
+    .analysis-progress.indeterminate .analysis-progress-fill {
+      width: 40%;
+      animation: progressIndeterminate 1.2s infinite ease-in-out;
+    }
+
+    @keyframes progressIndeterminate {
+      0% { transform: translateX(-110%); }
+      100% { transform: translateX(260%); }
     }
 
     @keyframes spin {
@@ -324,10 +393,87 @@
 
     .error-message.visible { display: block; }
 
+    .inline-date-error {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #ffc9c9;
+      display: none;
+    }
+
+    .inline-date-error.visible {
+      display: block;
+    }
+
+    .export-actions {
+      display: none;
+      gap: 10px;
+      margin: 12px 0 16px;
+      flex-wrap: wrap;
+    }
+
+    .export-actions.visible {
+      display: flex;
+    }
+
+    .export-btn {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-soft);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .history-panel {
+      margin-top: 16px;
+    }
+
+    .history-panel summary {
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-soft);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .history-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.02);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .history-item-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: pre-line;
+    }
+
+    .history-load-btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text-soft);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
     .results-pane {
       min-height: 0;
       overflow: auto;
       padding-right: 4px;
+      position: relative;
     }
 
     #empty-state {
@@ -891,18 +1037,22 @@
         </div>
 
         <button class="btn" id="btn-analyze">
-          Analisar Dados
+          <span class="btn-label">Analisar Dados</span>
+          <span class="btn-spinner" aria-hidden="true"></span>
         </button>
 
-        <div class="loading-state" id="loading">
-          <div class="spinner"></div>
-          <span>Processando...</span>
-        </div>
+        <div class="inline-date-error" id="date-error-msg"></div>
 
         <div class="error-message" id="error-msg"></div>
       </div>
 
       <div class="results-pane">
+      <div class="analysis-progress" id="analysis-progress" aria-label="Progresso da análise">
+        <div class="analysis-progress-track">
+          <div class="analysis-progress-fill" id="analysis-progress-fill"></div>
+        </div>
+      </div>
+
       <div id="empty-state">
         <p style="color: var(--text-muted); font-size: 13px;">
           Aguardando análise...<br>
@@ -911,6 +1061,11 @@
       </div>
 
       <div id="results-container">
+        <div class="export-actions" id="export-actions">
+          <button class="export-btn" id="btn-export-json" type="button">Exportar JSON</button>
+          <button class="export-btn" id="btn-export-csv" type="button">Exportar CSV</button>
+        </div>
+
         <div class="results-header">
           <div class="results-info">
             <div class="results-period" id="res-period">—</div>
@@ -1033,6 +1188,11 @@
           <h3>Análise da IA</h3>
           <div class="explanation-text" id="res-explanation">—</div>
         </div>
+
+        <details class="card history-panel" id="history-panel">
+          <summary>Histórico</summary>
+          <div class="history-list" id="history-list">Sem análises anteriores.</div>
+        </details>
       </div>
       </div>
     </div>
@@ -1044,6 +1204,181 @@
 
   <script>
     const API_BASE = 'http://localhost:8000';
+    let lastAnalysisId = null;
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function formatExplanationHtml(text) {
+      const escaped = escapeHtml(text || '');
+      return escaped.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+    }
+
+    function showDateError(msg) {
+      const el = document.getElementById('date-error-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideDateError() {
+      document.getElementById('date-error-msg').classList.remove('visible');
+    }
+
+    function validateDateRange(startDate, endDate) {
+      if (!startDate || !endDate) return { ok: true };
+
+      const start = new Date(`${startDate}T00:00:00`);
+      const end = new Date(`${endDate}T00:00:00`);
+
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return { ok: false, message: 'Datas inválidas. Use o formato correto (YYYY-MM-DD).' };
+      }
+
+      if (start > end) {
+        return { ok: false, message: 'Intervalo inválido: a data inicial deve ser menor ou igual à data final.' };
+      }
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      const days = Math.floor((end - start) / dayMs) + 1;
+      if (days > 90) {
+        return { ok: false, message: 'Intervalo inválido: o período máximo permitido é de 90 dias.' };
+      }
+
+      return { ok: true };
+    }
+
+    function progressFromMessage(message) {
+      const text = String(message || '').toLowerCase();
+      if (text.includes('parsing')) return 22;
+      if (text.includes('query principal')) return 48;
+      if (text.includes('tráfego suspeito') || text.includes('trafego suspeito')) return 72;
+      if (text.includes('explicação') || text.includes('explicacao') || text.includes('ia')) return 88;
+      if (text.includes('finalizada')) return 100;
+      if (text.includes('aguardando')) return 10;
+      return 16;
+    }
+
+    function setProgress(value, indeterminate = false) {
+      const wrap = document.getElementById('analysis-progress');
+      const fill = document.getElementById('analysis-progress-fill');
+      wrap.classList.add('active');
+      if (indeterminate) {
+        wrap.classList.add('indeterminate');
+      } else {
+        wrap.classList.remove('indeterminate');
+        const clamped = Math.max(0, Math.min(100, Number(value || 0)));
+        fill.style.width = `${clamped}%`;
+      }
+    }
+
+    function resetProgress() {
+      const wrap = document.getElementById('analysis-progress');
+      const fill = document.getElementById('analysis-progress-fill');
+      wrap.classList.remove('active', 'indeterminate');
+      fill.style.width = '0%';
+    }
+
+    async function pollJobUntilDone(jobId) {
+      while (true) {
+        const response = await fetch(`${API_BASE}/status/${jobId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || `Falha ao consultar status do job (${response.status})`);
+        }
+
+        setProgress(progressFromMessage(data.message), false);
+
+        if (data.state === 'completed') {
+          return data.result;
+        }
+
+        if (data.state === 'failed') {
+          throw new Error(data.error || 'Falha durante a execução da análise.');
+        }
+
+        await sleep(2000);
+      }
+    }
+
+    async function loadHistory() {
+      try {
+        const response = await fetch(`${API_BASE}/history?limit=10`);
+        const data = await response.json();
+        if (!response.ok) return;
+
+        const items = data.items || [];
+        const container = document.getElementById('history-list');
+        if (!items.length) {
+          container.textContent = 'Sem análises anteriores.';
+          return;
+        }
+
+        container.innerHTML = '';
+        items.forEach((item) => {
+          const card = document.createElement('div');
+          card.className = 'history-item';
+
+          const meta = document.createElement('div');
+          meta.className = 'history-item-meta';
+          meta.textContent = `${item.publisher || 'não especificado'}\n${item.start_date} -> ${item.end_date}\n${item.status || 'sem status'}`;
+
+          const btn = document.createElement('button');
+          btn.className = 'history-load-btn';
+          btn.type = 'button';
+          btn.textContent = 'Carregar';
+          btn.addEventListener('click', async () => {
+            try {
+              const detailResponse = await fetch(`${API_BASE}/history/${item.id}`);
+              const detail = await detailResponse.json();
+              if (!detailResponse.ok) {
+                throw new Error(detail.detail || 'Falha ao carregar item do histórico.');
+              }
+              lastAnalysisId = item.id;
+              renderResults(detail.result || {});
+              document.getElementById('export-actions').classList.add('visible');
+            } catch (err) {
+              showError(`Falha ao carregar histórico: ${err.message}`);
+            }
+          });
+
+          card.appendChild(meta);
+          card.appendChild(btn);
+          container.appendChild(card);
+        });
+      } catch (_err) {
+        // Histórico é complementar e não deve bloquear o fluxo principal.
+      }
+    }
+
+    async function exportLastAnalysis(fmt) {
+      const idPart = lastAnalysisId ? `?analysis_id=${encodeURIComponent(lastAnalysisId)}` : '';
+      const response = await fetch(`${API_BASE}/export/${fmt}${idPart}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || 'Falha na exportação.');
+      }
+
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const suffix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      link.href = url;
+      link.download = fmt === 'csv' ? `analise_${suffix}.csv` : `analise_${suffix}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
 
     function fmt(n) {
       if (n == null || n === '—') return '—';
@@ -1339,7 +1674,7 @@
       diffViewableEl.className = `disc-value ${getSignedCountClass(viewableDelta)}`.trim();
 
       // Explanation
-      document.getElementById('res-explanation').textContent = data.explanation;
+      document.getElementById('res-explanation').innerHTML = formatExplanationHtml(data.explanation);
       renderSuspiciousAnalysis(data.suspicious_analysis);
 
       // Show results
@@ -1357,6 +1692,7 @@
       const scriptId = document.getElementById('script-id').value.trim();
       const suspiciousTraffic = document.getElementById('suspicious-traffic').checked;
       const isFileMode = document.getElementById('mode-file').classList.contains('active');
+      hideDateError();
 
       if (!scriptId) {
         showError('Script ID é obrigatório para prosseguir com a análise.');
@@ -1373,8 +1709,9 @@
         return;
       }
 
-      if (!isFileMode && textStartDate && textEndDate && textStartDate >= textEndDate) {
-        showError('A data inicial deve ser menor que a data final (final é exclusiva).');
+      const textDateValidation = validateDateRange(textStartDate, textEndDate);
+      if (!isFileMode && !textDateValidation.ok) {
+        showDateError(textDateValidation.message);
         return;
       }
 
@@ -1388,8 +1725,9 @@
         return;
       }
 
-      if (isFileMode && analysisStartDate >= analysisEndDate) {
-        showError('A data inicial deve ser menor que a data final (final é exclusiva).');
+      const fileDateValidation = validateDateRange(analysisStartDate, analysisEndDate);
+      if (isFileMode && !fileDateValidation.ok) {
+        showDateError(fileDateValidation.message);
         return;
       }
 
@@ -1397,10 +1735,12 @@
 
       const btn = document.getElementById('btn-analyze');
       btn.disabled = true;
-      document.getElementById('loading').classList.add('active');
+      btn.classList.add('loading');
+      setProgress(10, false);
 
       try {
         let response;
+        let data;
         if (isFileMode) {
           const formData = new FormData();
           formData.append('file', reportFile);
@@ -1409,12 +1749,33 @@
           formData.append('script_id', scriptId);
           formData.append('suspicious_traffic', suspiciousTraffic ? 'true' : 'false');
 
-          response = await fetch(`${API_BASE}/analyze-file`, {
+          response = await fetch(`${API_BASE}/analyze-file-job`, {
             method: 'POST',
             body: formData,
           });
+
+          // Compatibilidade: backend antigo sem endpoints assíncronos.
+          if (response.status === 404) {
+            setProgress(35, true);
+            response = await fetch(`${API_BASE}/analyze-file`, {
+              method: 'POST',
+              body: formData,
+            });
+            data = await response.json();
+            if (!response.ok) {
+              const detail = data.detail || `Erro HTTP ${response.status}`;
+              throw new Error(detail);
+            }
+          } else {
+            const jobResponse = await response.json();
+            if (!response.ok) {
+              const detail = jobResponse.detail || `Erro HTTP ${response.status}`;
+              throw new Error(detail);
+            }
+            data = await pollJobUntilDone(jobResponse.job_id);
+          }
         } else {
-          response = await fetch(`${API_BASE}/analyze`, {
+          response = await fetch(`${API_BASE}/analyze-job`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1425,29 +1786,74 @@
               suspicious_traffic: suspiciousTraffic,
             }),
           });
+
+          // Compatibilidade: backend antigo sem endpoints assíncronos.
+          if (response.status === 404) {
+            setProgress(35, true);
+            response = await fetch(`${API_BASE}/analyze`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                report_text: reportText,
+                start_date: textStartDate || null,
+                end_date: textEndDate || null,
+                script_id: scriptId,
+                suspicious_traffic: suspiciousTraffic,
+              }),
+            });
+            data = await response.json();
+            if (!response.ok) {
+              const detail = data.detail || `Erro HTTP ${response.status}`;
+              throw new Error(detail);
+            }
+          } else {
+            const jobResponse = await response.json();
+            if (!response.ok) {
+              const detail = jobResponse.detail || `Erro HTTP ${response.status}`;
+              throw new Error(detail);
+            }
+            data = await pollJobUntilDone(jobResponse.job_id);
+          }
         }
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          const detail = data.detail || `Erro HTTP ${response.status}`;
-          throw new Error(detail);
-        }
+        setProgress(100, false);
 
         renderResults(data);
+        document.getElementById('export-actions').classList.add('visible');
+        await loadHistory();
+        const historyResp = await fetch(`${API_BASE}/history?limit=1`);
+        const historyData = await historyResp.json();
+        if (historyResp.ok && historyData.items && historyData.items.length > 0) {
+          lastAnalysisId = historyData.items[0].id;
+        }
 
       } catch (err) {
         showError(`Falha na análise: ${err.message}`);
         document.getElementById('empty-state').classList.remove('hidden');
         document.getElementById('results-container').classList.remove('visible');
       } finally {
-        document.getElementById('loading').classList.remove('active');
+        resetProgress();
+        btn.classList.remove('loading');
         btn.disabled = false;
       }
     }
 
     // Botão click handler
     document.getElementById('btn-analyze').addEventListener('click', runAnalysis);
+    document.getElementById('btn-export-json').addEventListener('click', async () => {
+      try {
+        await exportLastAnalysis('json');
+      } catch (err) {
+        showError(`Falha ao exportar JSON: ${err.message}`);
+      }
+    });
+    document.getElementById('btn-export-csv').addEventListener('click', async () => {
+      try {
+        await exportLastAnalysis('csv');
+      } catch (err) {
+        showError(`Falha ao exportar CSV: ${err.message}`);
+      }
+    });
 
     document.getElementById('mode-text').addEventListener('click', () => setInputMode('text'));
     document.getElementById('mode-file').addEventListener('click', () => setInputMode('file'));
@@ -1468,6 +1874,7 @@
     enableDateCalendarAssist('text-end-date');
     enableDateCalendarAssist('analysis-start-date');
     enableDateCalendarAssist('analysis-end-date');
+    loadHistory();
 
     // Ctrl+Enter para submeter
     document.getElementById('report-text').addEventListener('keydown', (e) => {

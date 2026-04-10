@@ -31,6 +31,12 @@ SERVED_LABELS = [
     "impressions",
     "measurable",
     "total impressions",
+    "impressões servidas",
+    "impressoes servidas",
+    "impressões",
+    "impressoes",
+    "total de impressões",
+    "total de impressoes",
 ]
 
 VIEWABLE_LABELS = [
@@ -39,6 +45,14 @@ VIEWABLE_LABELS = [
     "active views",
     "active view",
     "viewable ads",
+    "visualizáveis",
+    "visualizaveis",
+    "impressões visualizáveis",
+    "impressoes visualizaveis",
+    "visualizações",
+    "visualizacoes",
+    "taxa de visualização",
+    "taxa de visualizacao",
 ]
 
 SERVED_ALIASES = ["si", "served", "served impression", "served impressions"]
@@ -321,7 +335,7 @@ def _parse_ai_json(raw: str, report_text: str) -> dict:
         fallback = _deterministic_extract(report_text)
         if fallback.get("served_impressions") and fallback.get("start_date") and fallback.get("end_date"):
             return fallback
-        raise ValueError(f"Failed to parse JSON from Gemini response: {exc}") from exc
+        raise ValueError(f"Falha ao interpretar JSON retornado pelo Gemini: {exc}") from exc
 
     for field in ("served_impressions", "viewable_impressions"):
         parsed[field] = _normalize_number(parsed.get(field))

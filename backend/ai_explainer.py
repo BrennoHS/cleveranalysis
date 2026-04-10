@@ -12,7 +12,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), overrid
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 EXPLAINER_MODEL = os.environ.get("GEMINI_EXPLAINER_MODEL", "gemini-flash-lite-latest")
-EXPLAINER_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_EXPLAINER_MAX_OUTPUT_TOKENS", "320"))
+EXPLAINER_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_EXPLAINER_MAX_OUTPUT_TOKENS", "600"))
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -62,6 +62,7 @@ def _deterministic_fallback_explanation(
     start_date: str,
     end_date: str,
     publisher: str,
+    suspicious_analysis: dict | None = None,
 ) -> str:
     """Local Portuguese fallback used when Gemini quota/rate limits are reached."""
     pub_view_pct = result.pub_viewability * 100
@@ -70,7 +71,7 @@ def _deterministic_fallback_explanation(
     view_pp_sign = "+" if view_pp >= 0 else ""
 
     mode_label = "modo IA desativada" if not EXPLAINER_ENABLED else "modo contingência"
-    return (
+    explanation = (
         f"Resumo automático ({mode_label}): no período de {start_date} a {end_date}, "
         f"o publisher {publisher or 'não especificado'} reportou {result.pub_served:,} served e "
         f"{result.pub_viewable:,} viewable, enquanto a Clever registrou {result.clever_served:,} served e "
@@ -82,6 +83,21 @@ def _deterministic_fallback_explanation(
         f"{result.status}. Possíveis causas incluem diferenças de metodologia de medição, janela de contagem, "
         f"filtros de tráfego inválido e timing de renderização/tagueamento entre as plataformas."
     )
+
+    if suspicious_analysis and suspicious_analysis.get("enabled"):
+        risk_score = suspicious_analysis.get("risk_score")
+        if isinstance(risk_score, (int, float)) and float(risk_score) >= 40:
+            flags = suspicious_analysis.get("flags") or []
+            critical_flags = [str(flag).strip() for flag in flags if str(flag).strip()][:3]
+            flags_text = "; ".join(critical_flags) if critical_flags else "sinais críticos não detalhados"
+            explanation += (
+                "\n\nA análise determinística de tráfego suspeito indica risco relevante de tráfego inválido "
+                f"(score {float(risk_score):.1f}/100), com indícios como {flags_text}. "
+                "Esse padrão aumenta a probabilidade de que parte da discrepância observada esteja associada "
+                "a qualidade de tráfego e não apenas a diferenças metodológicas entre plataformas."
+            )
+
+    return explanation
 
 
 def _is_quota_or_rate_limit_error(exc: Exception) -> bool:
@@ -108,7 +124,7 @@ def generate_explanation(
     Returns a plain text explanation string.
     """
     if not EXPLAINER_ENABLED:
-        return _deterministic_fallback_explanation(result, start_date, end_date, publisher)
+        return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
 
     model = genai.GenerativeModel(EXPLAINER_MODEL)
 
@@ -129,7 +145,10 @@ def generate_explanation(
         publisher=publisher or "Not specified",
     )
 
-    if suspicious_analysis and suspicious_analysis.get("enabled"):
+    suspicious_enabled = bool(suspicious_analysis and suspicious_analysis.get("enabled"))
+    max_output_tokens = 800 if suspicious_enabled else EXPLAINER_MAX_OUTPUT_TOKENS
+
+    if suspicious_enabled:
         metrics = suspicious_analysis.get("metrics", {})
         overall = suspicious_analysis.get("overall", {})
         served = suspicious_analysis.get("served_analysis", {})
@@ -167,8 +186,10 @@ def generate_explanation(
             f"tempo médio por usuário (s): {viewable.get('avg_seconds_between_events_per_user', 'n/a')}\n"
             f"- Top IPs: {top_ip_text}\n"
             f"- Flags: {flags_text}\n\n"
-            "No final da análise, inclua um parecer objetivo sobre risco de tráfego inválido com uma classificação clara"
-            " (baixo/moderado/alto) e recomendação operacional (ex.: monitorar, investigar profundamente, pausar campanha)."
+            "Integre o parecer de tráfego inválido no terceiro parágrafo da mesma análise, sem criar seção separada. "
+            "Nesse terceiro parágrafo, relacione explicitamente o risk score com a discrepância observada: "
+            "quando ambos estiverem altos, indique causalidade provável; quando divergirem, explique por que a relação é fraca "
+            "ou inconclusiva. Termine com recomendação operacional objetiva (monitorar, investigar profundamente, pausar campanha)."
         )
 
     try:
@@ -176,16 +197,17 @@ def generate_explanation(
             prompt,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.2,
-                max_output_tokens=EXPLAINER_MAX_OUTPUT_TOKENS,
+                max_output_tokens=max_output_tokens,
             ),
         )
         text = (response.text or "").strip()
     except Exception as exc:
         if _is_quota_or_rate_limit_error(exc):
-            return _deterministic_fallback_explanation(result, start_date, end_date, publisher)
-        raise
+            return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
+        fallback = _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
+        return "Serviço de IA temporariamente indisponível. Segue análise automática de contingência:\n\n" + fallback
 
     if not text:
-        return _deterministic_fallback_explanation(result, start_date, end_date, publisher)
+        return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
 
     return text

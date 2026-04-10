@@ -26,6 +26,12 @@ SERVED_HEADERS = {
     "ad server impressions",
     "total impressions",
     "measurable impressions",
+    "impressões servidas",
+    "impressoes servidas",
+    "impressões",
+    "impressoes",
+    "total de impressões",
+    "total de impressoes",
 }
 
 VIEWABLE_HEADERS = {
@@ -34,6 +40,14 @@ VIEWABLE_HEADERS = {
     "ad server active view viewable impressions",
     "active views",
     "active view",
+    "visualizáveis",
+    "visualizaveis",
+    "impressões visualizáveis",
+    "impressoes visualizaveis",
+    "visualizações",
+    "visualizacoes",
+    "taxa de visualização",
+    "taxa de visualizacao",
 }
 
 
@@ -116,7 +130,7 @@ def _find_header_row(rows: list[list[Any]]) -> tuple[int, list[str]]:
             return idx, normalized
 
     raise ValueError(
-        "Could not identify table headers. Expected columns like Date, Impressions and Viewable Impressions."
+        "Não foi possível identificar os cabeçalhos da tabela. Esperado: colunas como Data, Impressões e Impressões Visualizáveis."
     )
 
 
@@ -158,9 +172,9 @@ def _extract_metrics_for_period(rows: list[list[Any]], start_date: date, end_dat
     viewable_col = _index_by_header(headers, VIEWABLE_HEADERS)
 
     if date_col is None:
-        raise ValueError("Date column not found in uploaded report.")
+        raise ValueError("Coluna de data não encontrada no relatório enviado.")
     if served_col is None:
-        raise ValueError("Impressions column not found in uploaded report.")
+        raise ValueError("Coluna de impressões não encontrada no relatório enviado.")
 
     served_total = 0
     viewable_total = 0
@@ -186,7 +200,7 @@ def _extract_metrics_for_period(rows: list[list[Any]], start_date: date, end_dat
 
     if match_count == 0:
         raise ValueError(
-            f"No rows found for analysis period [{start_date.isoformat()}, {end_date.isoformat()}) in uploaded report."
+            f"Nenhuma linha encontrada para o período [{start_date.isoformat()}, {end_date.isoformat()}) no relatório enviado."
         )
 
     return {
@@ -201,11 +215,11 @@ def parse_publisher_report_file(content: bytes, filename: str, start_date_str: s
     start_date = _parse_date_value(start_date_str)
     end_date = _parse_date_value(end_date_str)
     if start_date is None:
-        raise ValueError("start_date must be a valid date in YYYY-MM-DD format.")
+        raise ValueError("start_date deve ser uma data válida no formato YYYY-MM-DD.")
     if end_date is None:
-        raise ValueError("end_date must be a valid date in YYYY-MM-DD format.")
+        raise ValueError("end_date deve ser uma data válida no formato YYYY-MM-DD.")
     if start_date >= end_date:
-        raise ValueError("start_date must be earlier than end_date.")
+        raise ValueError("start_date deve ser anterior a end_date.")
 
     name = (filename or "").lower()
     if name.endswith(".xlsx"):
@@ -213,6 +227,6 @@ def parse_publisher_report_file(content: bytes, filename: str, start_date_str: s
     elif name.endswith(".csv"):
         rows = _rows_from_csv(content)
     else:
-        raise ValueError("Unsupported file type. Please upload .xlsx or .csv report files.")
+        raise ValueError("Tipo de arquivo não suportado. Envie relatórios .xlsx ou .csv.")
 
     return _extract_metrics_for_period(rows, start_date, end_date)

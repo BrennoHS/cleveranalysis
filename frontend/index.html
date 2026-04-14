@@ -6,6 +6,7 @@
   <title>AdOps Report Analyzer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -178,7 +179,7 @@
     textarea {
       resize: vertical;
       min-height: 120px;
-      font-family: 'Consolas', 'Courier New', monospace;
+      font-family: inherit;
       line-height: 1.5;
     }
 
@@ -404,71 +405,6 @@
       display: block;
     }
 
-    .export-actions {
-      display: none;
-      gap: 10px;
-      margin: 12px 0 16px;
-      flex-wrap: wrap;
-    }
-
-    .export-actions.visible {
-      display: flex;
-    }
-
-    .export-btn {
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-soft);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    .history-panel {
-      margin-top: 16px;
-    }
-
-    .history-panel summary {
-      cursor: pointer;
-      font-size: 13px;
-      color: var(--text-soft);
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-
-    .history-list {
-      display: grid;
-      gap: 8px;
-    }
-
-    .history-item {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 10px;
-      background: rgba(255,255,255,0.02);
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .history-item-meta {
-      font-size: 12px;
-      color: var(--text-muted);
-      white-space: pre-line;
-    }
-
-    .history-load-btn {
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.06);
-      color: var(--text-soft);
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-size: 11px;
-      cursor: pointer;
-    }
-
     .results-pane {
       min-height: 0;
       overflow: auto;
@@ -509,12 +445,6 @@
       font-size: 17px;
       font-weight: 650;
       letter-spacing: -0.2px;
-    }
-
-    .results-publisher {
-      color: var(--text-muted);
-      font-size: 12px;
-      margin-top: 2px;
     }
 
     .status-badge {
@@ -957,6 +887,123 @@
     }
 
     .hidden { display: none !important; }
+
+    .flatpickr-calendar {
+      background: #141414;
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--shadow);
+      border-radius: 12px;
+      color: var(--text-main);
+      font-size: 12px;
+      box-sizing: border-box;
+      width: 248px;
+      padding: 0 10px 8px;
+    }
+
+    .flatpickr-weekdays,
+    .flatpickr-days,
+    .flatpickr-rContainer,
+    .flatpickr-innerContainer,
+    .flatpickr-weekdaycontainer,
+    .dayContainer {
+      width: 224px;
+      min-width: 224px;
+      max-width: 224px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .flatpickr-months .flatpickr-month,
+    .flatpickr-current-month .flatpickr-monthDropdown-months,
+    .flatpickr-current-month input.cur-year,
+    .flatpickr-weekdays,
+    span.flatpickr-weekday {
+      color: var(--text-main);
+      background: #141414;
+      fill: var(--text-main);
+    }
+
+    .flatpickr-current-month .flatpickr-monthDropdown-months {
+      background: #141414;
+      color: var(--text-main);
+      border: 1px solid var(--border-strong);
+      color-scheme: dark;
+      -webkit-text-fill-color: var(--text-main);
+      forced-color-adjust: none;
+    }
+
+    .flatpickr-current-month .flatpickr-monthDropdown-months option {
+      background: #141414;
+      color: var(--text-main);
+      color-scheme: dark;
+      -webkit-text-fill-color: var(--text-main);
+      forced-color-adjust: none;
+    }
+
+    .flatpickr-current-month select.flatpickr-monthDropdown-months,
+    .flatpickr-current-month select.flatpickr-monthDropdown-months option,
+    .flatpickr-current-month select.flatpickr-monthDropdown-months optgroup {
+      background-color: #141414 !important;
+      color: #ffffff !important;
+    }
+
+    .flatpickr-current-month input.cur-year {
+      color: var(--text-main);
+    }
+
+    .flatpickr-current-month .numInputWrapper span.arrowUp:after {
+      border-bottom-color: var(--text-main);
+    }
+
+    .flatpickr-current-month .numInputWrapper span.arrowDown:after {
+      border-top-color: var(--text-main);
+    }
+
+    .flatpickr-day {
+      color: var(--text-soft);
+      border-radius: 8px;
+      border: 1px solid transparent;
+      box-sizing: border-box;
+      width: 14.2857143%;
+      min-width: 14.2857143%;
+      max-width: 14.2857143%;
+      height: 34px;
+      line-height: 34px;
+    }
+
+    .flatpickr-day:hover,
+    .flatpickr-day:focus {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: transparent;
+    }
+
+    .flatpickr-day.today {
+      border-color: rgba(255, 255, 255, 0.35);
+      color: var(--white);
+    }
+
+    .flatpickr-day.selected,
+    .flatpickr-day.startRange,
+    .flatpickr-day.endRange {
+      background: var(--white);
+      color: #0a0a0a;
+      border-color: var(--white);
+    }
+
+    .flatpickr-day.nextMonthDay,
+    .flatpickr-day.prevMonthDay {
+      color: #666;
+    }
+
+    .flatpickr-months .flatpickr-prev-month:hover svg,
+    .flatpickr-months .flatpickr-next-month:hover svg {
+      fill: var(--white);
+    }
+
+    .flatpickr-months .flatpickr-prev-month svg,
+    .flatpickr-months .flatpickr-next-month svg {
+      fill: var(--white);
+    }
   </style>
 </head>
 <body>
@@ -983,11 +1030,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Data inicial (inclusiva)</label>
-                <input type="date" id="text-start-date" />
+                <input type="text" id="text-start-date" class="date-input" autocomplete="off" placeholder="dd/mm/aaaa" />
               </div>
               <div class="form-group">
                 <label>Data final (exclusiva)</label>
-                <input type="date" id="text-end-date" />
+                <input type="text" id="text-end-date" class="date-input" autocomplete="off" placeholder="dd/mm/aaaa" />
               </div>
             </div>
 
@@ -1008,11 +1055,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Data inicial (inclusiva)</label>
-                <input type="date" id="analysis-start-date" />
+                <input type="text" id="analysis-start-date" class="date-input" autocomplete="off" placeholder="dd/mm/aaaa" />
               </div>
               <div class="form-group">
                 <label>Data final (exclusiva)</label>
-                <input type="date" id="analysis-end-date" />
+                <input type="text" id="analysis-end-date" class="date-input" autocomplete="off" placeholder="dd/mm/aaaa" />
               </div>
             </div>
 
@@ -1061,15 +1108,10 @@
       </div>
 
       <div id="results-container">
-        <div class="export-actions" id="export-actions">
-          <button class="export-btn" id="btn-export-json" type="button">Exportar JSON</button>
-          <button class="export-btn" id="btn-export-csv" type="button">Exportar CSV</button>
-        </div>
 
         <div class="results-header">
           <div class="results-info">
             <div class="results-period" id="res-period">—</div>
-            <div class="results-publisher" id="res-publisher">—</div>
           </div>
           <div class="status-badge" id="res-badge">
             Baixa discrepância
@@ -1093,7 +1135,7 @@
                   <td id="res-pub-served">—</td>
                 </tr>
                 <tr>
-                  <td>Viewable Impressions (Ajustada)</td>
+                  <td>Viewable Impressions</td>
                   <td id="res-clever-viewable">—</td>
                   <td id="res-pub-viewable">—</td>
                 </tr>
@@ -1189,10 +1231,6 @@
           <div class="explanation-text" id="res-explanation">—</div>
         </div>
 
-        <details class="card history-panel" id="history-panel">
-          <summary>Histórico</summary>
-          <div class="history-list" id="history-list">Sem análises anteriores.</div>
-        </details>
       </div>
       </div>
     </div>
@@ -1202,9 +1240,10 @@
     Todos os direitos reservados © Brenno Henrique
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script>
     const API_BASE = 'http://localhost:8000';
-    let lastAnalysisId = null;
 
     function sleep(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1309,77 +1348,6 @@
       }
     }
 
-    async function loadHistory() {
-      try {
-        const response = await fetch(`${API_BASE}/history?limit=10`);
-        const data = await response.json();
-        if (!response.ok) return;
-
-        const items = data.items || [];
-        const container = document.getElementById('history-list');
-        if (!items.length) {
-          container.textContent = 'Sem análises anteriores.';
-          return;
-        }
-
-        container.innerHTML = '';
-        items.forEach((item) => {
-          const card = document.createElement('div');
-          card.className = 'history-item';
-
-          const meta = document.createElement('div');
-          meta.className = 'history-item-meta';
-          meta.textContent = `${item.publisher || 'não especificado'}\n${item.start_date} -> ${item.end_date}\n${item.status || 'sem status'}`;
-
-          const btn = document.createElement('button');
-          btn.className = 'history-load-btn';
-          btn.type = 'button';
-          btn.textContent = 'Carregar';
-          btn.addEventListener('click', async () => {
-            try {
-              const detailResponse = await fetch(`${API_BASE}/history/${item.id}`);
-              const detail = await detailResponse.json();
-              if (!detailResponse.ok) {
-                throw new Error(detail.detail || 'Falha ao carregar item do histórico.');
-              }
-              lastAnalysisId = item.id;
-              renderResults(detail.result || {});
-              document.getElementById('export-actions').classList.add('visible');
-            } catch (err) {
-              showError(`Falha ao carregar histórico: ${err.message}`);
-            }
-          });
-
-          card.appendChild(meta);
-          card.appendChild(btn);
-          container.appendChild(card);
-        });
-      } catch (_err) {
-        // Histórico é complementar e não deve bloquear o fluxo principal.
-      }
-    }
-
-    async function exportLastAnalysis(fmt) {
-      const idPart = lastAnalysisId ? `?analysis_id=${encodeURIComponent(lastAnalysisId)}` : '';
-      const response = await fetch(`${API_BASE}/export/${fmt}${idPart}`);
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || 'Falha na exportação.');
-      }
-
-      const blob = await response.blob();
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      const now = new Date();
-      const suffix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-      link.href = url;
-      link.download = fmt === 'csv' ? `analise_${suffix}.csv` : `analise_${suffix}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-
     function fmt(n) {
       if (n == null || n === '—') return '—';
       return Number(n).toLocaleString('en-US');
@@ -1400,6 +1368,26 @@
       const num = Number(n);
       const sign = num > 0 ? '+' : '';
       return `${sign}${num.toLocaleString('en-US')}`;
+    }
+
+    function formatDateBRShort(value) {
+      if (!value) return '—';
+      const raw = String(value).split('T')[0];
+      const parts = raw.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${day}/${month}/${String(year).slice(-2)}`;
+      }
+
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+        });
+      }
+      return String(value);
     }
 
     function showError(msg) {
@@ -1441,8 +1429,23 @@
     function setExclusiveRange(startDate, endDate, mode = 'file') {
       const startId = mode === 'text' ? 'text-start-date' : 'analysis-start-date';
       const endId = mode === 'text' ? 'text-end-date' : 'analysis-end-date';
-      document.getElementById(startId).value = toIsoDate(startDate);
-      document.getElementById(endId).value = toIsoDate(endDate);
+      const startEl = document.getElementById(startId);
+      const endEl = document.getElementById(endId);
+      const startIso = toIsoDate(startDate);
+      const endIso = toIsoDate(endDate);
+
+      if (startEl && startEl._flatpickr) {
+        startEl._flatpickr.setDate(startIso, true, 'Y-m-d');
+      } else if (startEl) {
+        startEl.value = startIso;
+      }
+
+      if (endEl && endEl._flatpickr) {
+        endEl._flatpickr.setDate(endIso, true, 'Y-m-d');
+      } else if (endEl) {
+        endEl.value = endIso;
+      }
+
       setInputMode(mode);
     }
 
@@ -1475,19 +1478,25 @@
       }
     }
 
-    function enableDateCalendarAssist(inputId) {
-      const input = document.getElementById(inputId);
-      if (!input) return;
+    function initDatePickers() {
+      if (typeof flatpickr !== 'function') return;
 
-      // Keep field editable, but trigger native picker when supported.
-      const openPicker = () => {
-        if (typeof input.showPicker === 'function') {
-          input.showPicker();
-        }
-      };
+      flatpickr.localize(flatpickr.l10ns.pt || flatpickr.l10ns.default);
 
-      input.addEventListener('click', openPicker);
-      input.addEventListener('focus', openPicker);
+      ['text-start-date', 'text-end-date', 'analysis-start-date', 'analysis-end-date'].forEach((id) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+
+        flatpickr(input, {
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: false,
+          disableMobile: true,
+          locale: 'pt',
+          clickOpens: true,
+        });
+      });
     }
 
     function setStatus(status) {
@@ -1634,17 +1643,21 @@
 
     function renderResults(data) {
       // Header info
-      document.getElementById('res-period').textContent =
-        `${data.start_date} → ${data.end_date}`;
-      document.getElementById('res-publisher').textContent =
-        `Publisher: ${data.publisher}`;
+      const startDate = formatDateBRShort(data.start_date);
+      const endDate = formatDateBRShort(data.end_date);
+      document.getElementById('res-period').textContent = `${startDate} a ${endDate}`;
 
       setStatus(data.status);
 
       // Table
       document.getElementById('res-clever-served').textContent = fmt(data.clever_served);
       document.getElementById('res-pub-served').textContent = fmt(data.pub_served);
-      document.getElementById('res-clever-viewable').textContent = fmt(data.clever_viewable);
+      const cleverViewableAdjusted = Number(data.clever_viewable || 0);
+      const cleverGarbage = Number(data.clever_garbage || 0);
+      const cleverViewableRaw = Math.max(cleverViewableAdjusted - cleverGarbage, 0);
+      const cleverViewableCell = document.getElementById('res-clever-viewable');
+      cleverViewableCell.textContent = fmt(cleverViewableRaw);
+      cleverViewableCell.title = `Viewable bruto: ${fmt(cleverViewableRaw)} | Viewable ajustado: ${fmt(cleverViewableAdjusted)} (inclui garbage)`;
       document.getElementById('res-pub-viewable').textContent = fmt(data.pub_viewable);
       document.getElementById('res-clever-garbage').textContent = fmt(data.clever_garbage);
       
@@ -1819,14 +1832,6 @@
         setProgress(100, false);
 
         renderResults(data);
-        document.getElementById('export-actions').classList.add('visible');
-        await loadHistory();
-        const historyResp = await fetch(`${API_BASE}/history?limit=1`);
-        const historyData = await historyResp.json();
-        if (historyResp.ok && historyData.items && historyData.items.length > 0) {
-          lastAnalysisId = historyData.items[0].id;
-        }
-
       } catch (err) {
         showError(`Falha na análise: ${err.message}`);
         document.getElementById('empty-state').classList.remove('hidden');
@@ -1840,20 +1845,6 @@
 
     // Botão click handler
     document.getElementById('btn-analyze').addEventListener('click', runAnalysis);
-    document.getElementById('btn-export-json').addEventListener('click', async () => {
-      try {
-        await exportLastAnalysis('json');
-      } catch (err) {
-        showError(`Falha ao exportar JSON: ${err.message}`);
-      }
-    });
-    document.getElementById('btn-export-csv').addEventListener('click', async () => {
-      try {
-        await exportLastAnalysis('csv');
-      } catch (err) {
-        showError(`Falha ao exportar CSV: ${err.message}`);
-      }
-    });
 
     document.getElementById('mode-text').addEventListener('click', () => setInputMode('text'));
     document.getElementById('mode-file').addEventListener('click', () => setInputMode('file'));
@@ -1870,12 +1861,7 @@
 
     // Default mode
     setInputMode('text');
-    enableDateCalendarAssist('text-start-date');
-    enableDateCalendarAssist('text-end-date');
-    enableDateCalendarAssist('analysis-start-date');
-    enableDateCalendarAssist('analysis-end-date');
-    loadHistory();
-
+    initDatePickers();
     // Ctrl+Enter para submeter
     document.getElementById('report-text').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

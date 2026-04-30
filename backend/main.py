@@ -54,6 +54,7 @@ class AnalyzeRequest(BaseModel):
     publisher: str | None = None
     script_id: str | None = None
     suspicious_traffic: bool = False
+    ai_analysis: bool = False
 
 
 class AnalyzeResponse(BaseModel):
@@ -225,6 +226,7 @@ def _run_analysis_pipeline(
     start_date_override: str,
     end_date_override: str,
     suspicious_traffic: bool = False,
+    ai_analysis: bool = False,
     progress_callback=None,
 ) -> AnalyzeResponse:
     _validate_date_range_or_422(start_date_override, end_date_override)
@@ -291,18 +293,22 @@ def _run_analysis_pipeline(
                 "error": f"Falha ao executar análise de tráfego suspeito: {str(e)}",
             }
 
-    try:
-        if progress_callback:
-            progress_callback("Geração da explicação com IA")
-        explanation = generate_explanation(
-            result,
-            start_date,
-            end_date,
-            publisher_safe or "não especificado",
-            suspicious_analysis=suspicious_analysis,
-        )
-    except Exception as e:
-        explanation = "Análise da IA indisponível no momento."
+    if ai_analysis:
+        try:
+            if progress_callback:
+                progress_callback("Geração da explicação com IA")
+            explanation = generate_explanation(
+                result,
+                start_date,
+                end_date,
+                publisher_safe or "não especificado",
+                suspicious_analysis=suspicious_analysis,
+                ai_analysis_enabled=ai_analysis,
+            )
+        except Exception:
+            explanation = "Análise da IA indisponível no momento."
+    else:
+        explanation = "Análise com IA desativada."
 
     response = AnalyzeResponse(
         start_date=start_date,
@@ -344,6 +350,7 @@ def _run_text_job(job_id: str, request: AnalyzeRequest) -> None:
             start_date_override=request.start_date,
             end_date_override=request.end_date,
             suspicious_traffic=request.suspicious_traffic,
+            ai_analysis=request.ai_analysis,
             progress_callback=progress,
         )
         _set_job_status(job_id, "completed", "Análise finalizada", result=_analysis_to_dict(response))
@@ -362,6 +369,7 @@ def _run_file_job(
     publisher: str | None,
     script_id: str | None,
     suspicious_traffic: bool,
+    ai_analysis: bool,
 ) -> None:
     try:
         _set_job_status(job_id, "running", "Parsing do relatório")
@@ -377,6 +385,7 @@ def _run_file_job(
             start_date_override=start_date,
             end_date_override=end_date,
             suspicious_traffic=suspicious_traffic,
+            ai_analysis=ai_analysis,
             progress_callback=progress,
         )
         _set_job_status(job_id, "completed", "Análise finalizada", result=_analysis_to_dict(response))
@@ -499,6 +508,7 @@ async def analyze(request: AnalyzeRequest):
         start_date_override=request.start_date,
         end_date_override=request.end_date,
         suspicious_traffic=request.suspicious_traffic,
+        ai_analysis=request.ai_analysis,
     )
 
 
@@ -510,6 +520,7 @@ async def analyze_file(
     publisher: str | None = Form(None),
     script_id: str | None = Form(None),
     suspicious_traffic: bool = Form(False),
+    ai_analysis: bool = Form(False),
 ):
     """
     Analyze endpoint for structured report files (.xlsx/.csv) with a date range.
@@ -530,6 +541,7 @@ async def analyze_file(
         start_date_override=start_date,
         end_date_override=end_date,
         suspicious_traffic=suspicious_traffic,
+        ai_analysis=ai_analysis,
     )
 
 
@@ -556,6 +568,7 @@ async def analyze_file_job(
     publisher: str | None = Form(None),
     script_id: str | None = Form(None),
     suspicious_traffic: bool = Form(False),
+    ai_analysis: bool = Form(False),
 ):
     content = await file.read()
     if not content:
@@ -565,7 +578,7 @@ async def analyze_file_job(
     _set_job_status(job_id, "queued", "Aguardando processamento")
     worker = threading.Thread(
         target=_run_file_job,
-        args=(job_id, content, file.filename or "", start_date, end_date, publisher, script_id, suspicious_traffic),
+        args=(job_id, content, file.filename or "", start_date, end_date, publisher, script_id, suspicious_traffic, ai_analysis),
         daemon=True,
     )
     worker.start()

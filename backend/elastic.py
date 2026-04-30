@@ -38,13 +38,19 @@ ES_VIEWABLE_FIELD  = os.environ.get("ES_VIEWABLE_FIELD", "viewable_impressions")
 ES_TIMEZONE = os.environ.get("ES_TIMEZONE", "Europe/Lisbon").strip() or "Europe/Lisbon"
 ES_PUBLISHER_MATCH_MODE = os.environ.get("ES_PUBLISHER_MATCH_MODE", "contains").strip().lower()
 ES_IP_FALLBACK_MAX_HITS = int(os.environ.get("ES_IP_FALLBACK_MAX_HITS", "8000"))
-ES_BEHAVIOR_MAX_HITS = int(os.environ.get("ES_BEHAVIOR_MAX_HITS", "3000"))
-ES_BEHAVIOR_BASE_HITS = int(os.environ.get("ES_BEHAVIOR_BASE_HITS", "500"))
+ES_BEHAVIOR_MAX_HITS = int(os.environ.get("ES_BEHAVIOR_MAX_HITS", "1200"))
+ES_BEHAVIOR_BASE_HITS = int(os.environ.get("ES_BEHAVIOR_BASE_HITS", "250"))
 ES_BEHAVIOR_MIN_HITS_FOR_NO_ESCALATION = int(os.environ.get("ES_BEHAVIOR_MIN_HITS_FOR_NO_ESCALATION", "400"))
 ES_IP_TERMS_FALLBACK_SIZE = int(os.environ.get("ES_IP_TERMS_FALLBACK_SIZE", "30"))
 ES_BEHAVIOR_MIN_COVERAGE_FOR_ESCALATION = float(os.environ.get("ES_BEHAVIOR_MIN_COVERAGE_FOR_ESCALATION", "0.15"))
 ES_SKIP_SERVED_IP_AGG_FALLBACK = os.environ.get("ES_SKIP_SERVED_IP_AGG_FALLBACK", "true").strip().lower() in ("1", "true", "yes", "on")
 ES_INCLUDE_UA_ORIGINAL_AGG = os.environ.get("ES_INCLUDE_UA_ORIGINAL_AGG", "false").strip().lower() in ("1", "true", "yes", "on")
+ES_ENABLE_SUSPICIOUS_BEHAVIOR_ESCALATION = os.environ.get("ES_ENABLE_SUSPICIOUS_BEHAVIOR_ESCALATION", "false").strip().lower() in ("1", "true", "yes", "on")
+ES_SUSPICIOUS_HISTOGRAM_INTERVAL = os.environ.get("ES_SUSPICIOUS_HISTOGRAM_INTERVAL", "5m").strip() or "5m"
+ES_SUSPICIOUS_HISTOGRAM_INCLUDE_EMPTY = os.environ.get("ES_SUSPICIOUS_HISTOGRAM_INCLUDE_EMPTY", "false").strip().lower() in ("1", "true", "yes", "on")
+ES_SUSPICIOUS_IP_DAILY_TOP_SIZE = int(os.environ.get("ES_SUSPICIOUS_IP_DAILY_TOP_SIZE", "80"))
+ES_ENABLE_SUSPICIOUS_DIMENSION_FALLBACK = os.environ.get("ES_ENABLE_SUSPICIOUS_DIMENSION_FALLBACK", "false").strip().lower() in ("1", "true", "yes", "on")
+ES_SUSPICIOUS_FALLBACK_TIMEOUT_SECONDS = float(os.environ.get("ES_SUSPICIOUS_FALLBACK_TIMEOUT_SECONDS", "4.0"))
 SUSPICIOUS_CACHE_TTL_SECONDS = int(os.environ.get("SUSPICIOUS_CACHE_TTL_SECONDS", "120"))
 SUSPICIOUS_CACHE_MAX_ITEMS = int(os.environ.get("SUSPICIOUS_CACHE_MAX_ITEMS", "64"))
 
@@ -880,12 +886,13 @@ def _missing_value_for_terms(field: str) -> str | None:
 
 
 def _build_suspicious_query(filters: list[dict], fields: list[str]) -> dict:
+    histogram_min_doc_count = 0 if ES_SUSPICIOUS_HISTOGRAM_INCLUDE_EMPTY else 1
     aggs: dict = {
         "per_minute": {
             "date_histogram": {
                 "field": ES_DATE_FIELD,
-                "fixed_interval": "1m",
-                "min_doc_count": 0,
+                "fixed_interval": ES_SUSPICIOUS_HISTOGRAM_INTERVAL,
+                "min_doc_count": histogram_min_doc_count,
             }
         },
         "unique_ip": {
@@ -954,6 +961,7 @@ def _build_cardinality_query(filters: list[dict], field: str, agg_field: str | N
 
 
 def _build_histogram_query(filters: list[dict]) -> dict:
+    histogram_min_doc_count = 0 if ES_SUSPICIOUS_HISTOGRAM_INCLUDE_EMPTY else 1
     return {
         "size": 0,
         "track_total_hits": True,
@@ -962,8 +970,8 @@ def _build_histogram_query(filters: list[dict]) -> dict:
             "per_minute": {
                 "date_histogram": {
                     "field": ES_DATE_FIELD,
-                    "fixed_interval": "1m",
-                    "min_doc_count": 0,
+                    "fixed_interval": ES_SUSPICIOUS_HISTOGRAM_INTERVAL,
+                    "min_doc_count": histogram_min_doc_count,
                 }
             }
         },
@@ -977,6 +985,7 @@ def _build_consolidated_aggs_query(
     include_histogram: bool = True,
 ) -> dict:
     aggs: dict = {}
+    histogram_min_doc_count = 0 if ES_SUSPICIOUS_HISTOGRAM_INCLUDE_EMPTY else 1
 
     for agg_name, field, size in term_specs:
         missing_value = _missing_value_for_terms(field)
@@ -1004,8 +1013,8 @@ def _build_consolidated_aggs_query(
         aggs["per_minute"] = {
             "date_histogram": {
                 "field": ES_DATE_FIELD,
-                "fixed_interval": "1m",
-                "min_doc_count": 0,
+                "fixed_interval": ES_SUSPICIOUS_HISTOGRAM_INTERVAL,
+                "min_doc_count": histogram_min_doc_count,
             }
         }
 
@@ -1013,7 +1022,7 @@ def _build_consolidated_aggs_query(
     aggs["ip_daily_volume"] = {
         "terms": {
             "field": "source.ip",
-            "size": 200,
+            "size": max(10, ES_SUSPICIOUS_IP_DAILY_TOP_SIZE),
             "order": {"_count": "desc"},
         },
         "aggs": {
@@ -1084,7 +1093,14 @@ def _is_daily_volume_empty(volume: dict) -> bool:
     ))
 
 
-def _fetch_terms_distribution(index: str, filters: list[dict], field: str, total_docs: int, size: int = 500) -> list[dict]:
+def _fetch_terms_distribution(
+    index: str,
+    filters: list[dict],
+    field: str,
+    total_docs: int,
+    size: int = 500,
+    timeout_seconds: float | None = None,
+) -> list[dict]:
     if _should_skip_ip_agg_fallback(index, field):
         return []
 
@@ -1101,7 +1117,11 @@ def _fetch_terms_distribution(index: str, filters: list[dict], field: str, total
 
     last_terms: list[dict] = []
     for agg_field in candidates:
-        raw = _run_search_safe(index, _build_terms_query(filters, field, size=size, agg_field=agg_field))
+        raw = _run_search_safe(
+            index,
+            _build_terms_query(filters, field, size=size, agg_field=agg_field),
+            timeout_seconds=timeout_seconds,
+        )
         if not raw:
             continue
         terms = _extract_terms_from_agg(raw, _field_to_agg_name(field), total_docs)
@@ -1112,7 +1132,12 @@ def _fetch_terms_distribution(index: str, filters: list[dict], field: str, total
     return last_terms
 
 
-def _fetch_unique_count(index: str, filters: list[dict], field: str) -> int:
+def _fetch_unique_count(
+    index: str,
+    filters: list[dict],
+    field: str,
+    timeout_seconds: float | None = None,
+) -> int:
     if _should_skip_ip_agg_fallback(index, field):
         return 0
 
@@ -1128,7 +1153,11 @@ def _fetch_unique_count(index: str, filters: list[dict], field: str) -> int:
 
     last_value = 0
     for agg_field in dict.fromkeys(candidates):
-        raw = _run_search_safe(index, _build_cardinality_query(filters, field, agg_field=agg_field))
+        raw = _run_search_safe(
+            index,
+            _build_cardinality_query(filters, field, agg_field=agg_field),
+            timeout_seconds=timeout_seconds,
+        )
         if not raw:
             continue
         value = int(raw.get("aggregations", {}).get("unique_value", {}).get("value", 0) or 0)
@@ -1830,19 +1859,24 @@ def analyze_suspicious_traffic(
     viewable_consolidated_query = _build_consolidated_aggs_query(viewable_filters, viewable_term_specs, viewable_card_specs, include_histogram=True)
 
     t_queries_start = time_module.perf_counter()
-    bundle_responses = _run_msearch_safe([
+    bundled_requests = [
         (served_index, served_behavior_query),
         (viewable_index, viewable_behavior_query),
         (served_index, served_consolidated_query),
         (viewable_index, viewable_consolidated_query),
-    ])
+    ]
+    bundle_responses = _run_msearch_safe(bundled_requests)
     if bundle_responses is None:
-        bundle_responses = _run_searches_parallel([
-            (served_index, served_behavior_query),
-            (viewable_index, viewable_behavior_query),
-            (served_index, served_consolidated_query),
-            (viewable_index, viewable_consolidated_query),
-        ])
+        bundle_responses = _run_searches_parallel(bundled_requests)
+    else:
+        if len(bundle_responses) < len(bundled_requests):
+            while len(bundle_responses) < len(bundled_requests):
+                bundle_responses.append(None)
+        missing_indices = [i for i, item in enumerate(bundle_responses) if item is None]
+        if missing_indices:
+            recovered = _run_searches_parallel([bundled_requests[i] for i in missing_indices])
+            for idx, recovered_item in zip(missing_indices, recovered):
+                bundle_responses[idx] = recovered_item
 
     if not bundle_responses or len(bundle_responses) < 4:
         raise RuntimeError("All suspicious-analysis queries failed due to Elasticsearch/Kibana 400 errors")
@@ -1875,7 +1909,7 @@ def analyze_suspicious_traffic(
             viewable_docs = len(viewable_behavior_hits)
 
     # Adaptive escalation: fetch larger behavior samples only when initial coverage is low.
-    if behavior_hits_limit < ES_BEHAVIOR_MAX_HITS:
+    if ES_ENABLE_SUSPICIOUS_BEHAVIOR_ESCALATION and behavior_hits_limit < ES_BEHAVIOR_MAX_HITS:
         served_behavior_coverage = (len(served_behavior_hits) / served_docs) if served_docs > 0 else 1.0
         viewable_behavior_coverage = (len(viewable_behavior_hits) / viewable_docs) if viewable_docs > 0 else 1.0
         need_served_escalation = (
@@ -1955,12 +1989,6 @@ def analyze_suspicious_traffic(
     served_ip_top = _filter_valid_ip_buckets(served_ip_top)
     served_ip_extraction_mode = "aggregation"
 
-    if served_docs > 0 and not served_ip_top:
-        # Fallback to global terms query only if consolidated aggs missed source_ip.
-        served_ip_top_raw = _fetch_terms_distribution(served_index, served_filters, "source.ip", served_docs, size=ES_IP_TERMS_FALLBACK_SIZE)
-        served_ip_top = _filter_valid_ip_buckets(served_ip_top_raw)
-        served_ip_extraction_mode = "terms_query"
-
     if served_docs > 0 and not served_ip_top and served_ip_top_from_hits:
         # Last resort: sampled behavior hits.
         served_ip_top = served_ip_top_from_hits
@@ -1969,11 +1997,6 @@ def analyze_suspicious_traffic(
     viewable_ip_top = _extract_terms_from_agg(viewable_aggs_raw, "source_ip", viewable_docs)
     viewable_ip_top = _filter_valid_ip_buckets(viewable_ip_top)
     viewable_ip_extraction_mode = "aggregation"
-
-    if viewable_docs > 0 and not viewable_ip_top:
-        viewable_ip_top_raw = _fetch_terms_distribution(viewable_index, viewable_filters, "source.ip", viewable_docs, size=ES_IP_TERMS_FALLBACK_SIZE)
-        viewable_ip_top = _filter_valid_ip_buckets(viewable_ip_top_raw)
-        viewable_ip_extraction_mode = "terms_query"
 
     if viewable_docs > 0 and not viewable_ip_top and viewable_ip_top_from_hits:
         viewable_ip_top = viewable_ip_top_from_hits
@@ -2003,15 +2026,36 @@ def analyze_suspicious_traffic(
         terms = _extract_terms_from_agg(raw, agg_name, total)
         if terms or total <= 0:
             return terms
-        if not allow_fallback:
+        if not allow_fallback or not ES_ENABLE_SUSPICIOUS_DIMENSION_FALLBACK:
             return []
-        return _fetch_terms_distribution(index, filters, field, total, size=size)
+        return _fetch_terms_distribution(
+            index,
+            filters,
+            field,
+            total,
+            size=size,
+            timeout_seconds=ES_SUSPICIOUS_FALLBACK_TIMEOUT_SECONDS,
+        )
 
-    def _cardinality_with_fallback(raw: dict, agg_name: str, index: str, filters: list[dict], field: str) -> int:
+    def _cardinality_with_fallback(
+        raw: dict,
+        agg_name: str,
+        index: str,
+        filters: list[dict],
+        field: str,
+        allow_fallback: bool = False,
+    ) -> int:
         value = _extract_cardinality_from_agg(raw, agg_name)
         if value > 0:
             return value
-        return _fetch_unique_count(index, filters, field)
+        if not allow_fallback:
+            return 0
+        return _fetch_unique_count(
+            index,
+            filters,
+            field,
+            timeout_seconds=ES_SUSPICIOUS_FALLBACK_TIMEOUT_SECONDS,
+        )
 
     served_country = _terms_with_fallback(served_aggs_raw, "country", served_index, served_filters, "geo.country_code", served_docs)
     viewable_country = _terms_with_fallback(viewable_aggs_raw, "country", viewable_index, viewable_filters, "geo.country_code", viewable_docs)
@@ -2099,31 +2143,13 @@ def analyze_suspicious_traffic(
         if viewable_unique_ip_estimate > 0:
             unique_ip_viewable_source = "behavior_hits_estimate"
     
-    # CRITICAL: If we have unique_ip count but no top IP buckets, fetch them now
-    if unique_ip_served > 0 and not served_ip_top:
-        served_ip_top_raw = _fetch_terms_distribution(served_index, served_filters, "source.ip", served_docs, size=ES_IP_TERMS_FALLBACK_SIZE)
-        served_ip_top = _filter_valid_ip_buckets(served_ip_top_raw)
-        served_ip_extraction_mode = "critical_fallback_served"
-    
-    if unique_ip_viewable > 0 and not viewable_ip_top:
-        viewable_ip_top_raw = _fetch_terms_distribution(viewable_index, viewable_filters, "source.ip", viewable_docs, size=ES_IP_TERMS_FALLBACK_SIZE)
-        viewable_ip_top = _filter_valid_ip_buckets(viewable_ip_top_raw)
-        viewable_ip_extraction_mode = "critical_fallback_viewable"
-    unique_resolution_served = _cardinality_with_fallback(served_aggs_raw, "unique_resolution", served_index, served_filters, "os.resolution")
-    unique_resolution_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_resolution", viewable_index, viewable_filters, "os.resolution")
-    unique_region_served = _cardinality_with_fallback(served_aggs_raw, "unique_region", served_index, served_filters, "geo.region_code")
-    unique_region_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_region", viewable_index, viewable_filters, "geo.region_code")
+    unique_resolution_served = _cardinality_with_fallback(served_aggs_raw, "unique_resolution", served_index, served_filters, "os.resolution", allow_fallback=False)
+    unique_resolution_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_resolution", viewable_index, viewable_filters, "os.resolution", allow_fallback=False)
+    unique_region_served = _cardinality_with_fallback(served_aggs_raw, "unique_region", served_index, served_filters, "geo.region_code", allow_fallback=False)
+    unique_region_viewable = _cardinality_with_fallback(viewable_aggs_raw, "unique_region", viewable_index, viewable_filters, "geo.region_code", allow_fallback=False)
 
     served_hist_counts = _extract_histogram_from_agg(served_aggs_raw)
     viewable_hist_counts = _extract_histogram_from_agg(viewable_aggs_raw)
-    if not served_hist_counts and served_docs > 0:
-        served_hist_counts = _fetch_histogram_counts(served_index, served_filters, timeout_seconds=5.0)
-        if not served_hist_counts:
-            logger.warning("Histogram fallback returned empty for served index=%s", served_index)
-    if not viewable_hist_counts and viewable_docs > 0:
-        viewable_hist_counts = _fetch_histogram_counts(viewable_index, viewable_filters, timeout_seconds=5.0)
-        if not viewable_hist_counts:
-            logger.warning("Histogram fallback returned empty for viewable index=%s", viewable_index)
     combined_histogram = served_hist_counts[:]
     if viewable_hist_counts and len(viewable_hist_counts) == len(combined_histogram):
         combined_histogram = [combined_histogram[i] + viewable_hist_counts[i] for i in range(len(combined_histogram))]
@@ -2166,8 +2192,8 @@ def analyze_suspicious_traffic(
     served_ip_repetition_pct = _repeated_ip_traffic_pct(served_ip_top, served_events_base_for_repetition)
     viewable_ip_repetition_pct = _repeated_ip_traffic_pct(viewable_ip_top, viewable_events_base_for_repetition)
 
-    served_ip_scope = "global" if served_ip_extraction_mode in ("aggregation", "terms_query", "critical_fallback_served") else "sample"
-    viewable_ip_scope = "global" if viewable_ip_extraction_mode in ("aggregation", "terms_query", "critical_fallback_viewable") else "sample"
+    served_ip_scope = "global" if served_ip_extraction_mode == "aggregation" else "sample"
+    viewable_ip_scope = "global" if viewable_ip_extraction_mode == "aggregation" else "sample"
     served_unique_scope = "global" if unique_ip_served_source == "cardinality" else "sample"
     viewable_unique_scope = "global" if unique_ip_viewable_source == "cardinality" else "sample"
 

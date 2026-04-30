@@ -78,8 +78,8 @@ Depois edite o `backend/.env`:
 # Chave da API do Google Gemini
 GEMINI_API_KEY=your_gemini_api_key
 
-# Liga/desliga explicação com IA
-GEMINI_EXPLAINER_ENABLED=false
+# As explicações com IA são ativadas por requisição com o toggle `ai_analysis`.
+# Se a chave não estiver configurada, o backend usa a explicação determinística.
 
 # Conexão com Elasticsearch
 ES_URL=https://your-es-cluster-host:9200

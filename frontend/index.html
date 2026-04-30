@@ -76,18 +76,18 @@
       max-width: 1280px;
       width: 100%;
       margin: 0 auto;
-      padding: 10px 18px 8px;
+      padding: 6px 16px 4px;
       flex: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .container {
       display: grid;
       grid-template-columns: minmax(320px, 430px) 1fr;
-      gap: 14px;
+      gap: 12px;
       min-height: 0;
       flex: 1;
     }
@@ -99,22 +99,33 @@
     .input-section {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       min-height: 0;
-      overflow: auto;
-      padding-right: 4px;
+      overflow: hidden;
+      padding-right: 2px;
+    }
+
+    .input-section > .card.card-expand:first-of-type {
+      flex: 1 1 auto;
+      min-height: clamp(380px, 52vh, 560px);
+    }
+
+    .input-section > .card:not(.card-expand) {
+      flex: 0 0 auto;
     }
 
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03));
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       box-shadow: var(--shadow);
       animation: cardIn .35s ease both;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .card:nth-child(2) { animation-delay: .05s; }
@@ -126,21 +137,61 @@
     }
 
     .card h2 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 650;
       margin-bottom: 2px;
     }
 
     .card p {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
-      line-height: 1.65;
+      line-height: 1.55;
+    }
+
+    .card.card-expand {
+      justify-content: flex-start;
+    }
+
+    .card.card-expand .form-group,
+    .card.card-expand .toggle-stack {
+      min-height: 0;
+    }
+
+    .card.card-expand textarea {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .card.card-expand > .segment {
+      margin-bottom: 2px;
+    }
+
+    .card.card-expand > #text-mode-panel,
+    .card.card-expand > #file-mode-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card.card-expand > #text-mode-panel > .form-group:first-child {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .card.card-expand > #text-mode-panel textarea {
+      min-height: 120px;
+    }
+
+    .card.card-expand > #file-mode-panel > .form-group:first-child {
+      flex: 0 0 auto;
     }
 
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
     }
 
     .form-row {
@@ -154,11 +205,62 @@
     }
 
     label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: var(--text-soft);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+
+    /* Uniform form control alignment: labels and controls share the same left inset
+       and inputs take full width. This makes internal texts line up visually. */
+    .card .form-group > label {
+      display: block;
+      margin: 0 0 4px 0;
+      padding-left: 2px;
+      box-sizing: border-box;
+    }
+
+    textarea,
+    input[type="text"],
+    input[type="date"],
+    input[type="file"],
+    .segment,
+    .toggle-row > label {
+      box-sizing: border-box;
+    }
+
+    /* Make form controls align: same left edge and full width inside form-group */
+    .form-group > textarea,
+    .form-group > input[type="text"],
+    .form-group > input[type="date"],
+    .form-group > input[type="file"] {
+      margin-left: 0;
+      padding-left: 11px;
+      padding-right: 11px;
+      width: 100%;
+    }
+
+    /* Toggle rows: keep label aligned to form controls and compact the status text */
+    /* Keep toggle labels visually independent from form label alignment */
+    .toggle-row > label {
+      color: var(--text-soft);
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 11px;
+      line-height: 1.25;
+      cursor: pointer;
+      min-width: 0;
+      padding-left: 0;
+      margin: 0;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+
+    .toggle-row .toggle-status {
+      text-align: right;
+      padding-right: 6px;
     }
 
     textarea,
@@ -169,27 +271,27 @@
       background: rgba(0, 0, 0, 0.36);
       border: 1px solid var(--border);
       color: var(--text-main);
-      font-size: 13px;
+      font-size: 12px;
       border-radius: 11px;
-      padding: 11px 12px;
+      padding: 9px 11px;
       outline: none;
       transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
     }
 
     textarea {
       resize: vertical;
-      min-height: 120px;
+      min-height: 92px;
       font-family: inherit;
-      line-height: 1.5;
+      line-height: 1.45;
     }
 
     input[type="text"], input[type="date"] {
-      height: 42px;
+      height: 38px;
       font-family: inherit;
     }
 
     input[type="file"] {
-      padding: 9px 10px;
+      padding: 8px 10px;
     }
 
     textarea::placeholder,
@@ -219,12 +321,12 @@
     }
 
     .segment button {
-      height: 34px;
+      height: 32px;
       border-radius: 8px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-soft);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       transition: all .2s ease;
@@ -238,8 +340,11 @@
 
     .quick-range {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-wrap: nowrap;
+      gap: 6px;
+      align-items: center;
+      overflow-x: auto;
+      padding-bottom: 2px;
     }
 
     #file-mode-panel .form-row {
@@ -248,14 +353,30 @@
     }
 
     .quick-range button {
+      flex: 0 0 auto;
       border: 1px solid var(--border);
       background: rgba(255, 255, 255, 0.03);
       color: var(--text-soft);
       border-radius: 999px;
       padding: 6px 10px;
-      font-size: 11px;
+      width: auto;
+      font-size: 9px;
+      line-height: 1;
+      min-height: 28px;
       cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
       transition: border-color .2s ease, background .2s ease;
+    }
+
+    @media (max-width: 540px) {
+      .quick-range {
+        gap: 5px;
+      }
+
+      .quick-range button {
+        padding: 6px 8px;
+      }
     }
 
     .quick-range button:hover {
@@ -265,13 +386,13 @@
 
     .btn {
       width: 100%;
-      height: 42px;
-      min-height: 42px;
+      height: 38px;
+      min-height: 38px;
       border: none;
       border-radius: 12px;
       background: var(--white);
       color: #090909;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.6px;
@@ -410,6 +531,7 @@
       overflow: auto;
       padding-right: 4px;
       position: relative;
+      align-self: start;
     }
 
     #empty-state {
@@ -424,8 +546,23 @@
       padding: 24px;
     }
 
-    #results-container { display: none; }
-    #results-container.visible { display: block; animation: fadeIn .3s ease; }
+    #results-container {
+      display: none;
+      min-height: 0;
+      overflow: visible;
+    }
+    #results-container.visible { display: flex; animation: fadeIn .3s ease; flex-direction: column; gap: 12px; }
+
+    #results-container > .card,
+    #results-container > .discrepancy-section,
+    #results-container > .suspicious-panel,
+    #results-container > .explanation {
+      flex: 0 0 auto;
+    }
+
+    #results-container > .card {
+      min-height: max-content;
+    }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
@@ -630,6 +767,20 @@
       padding: 16px;
     }
 
+    .explanation-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .ai-status-badge {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      font-size: 10px;
+    }
+
     .check-row {
       display: flex;
       align-items: center;
@@ -652,6 +803,125 @@
       letter-spacing: 0;
       font-size: 12px;
       cursor: pointer;
+    }
+
+    .toggle-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toggle-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 9px 6px 8px; /* small left offset so toggle labels don't stick to container edge */
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .toggle-row label {
+      color: var(--text-soft);
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 11px;
+      line-height: 1.25;
+      cursor: pointer;
+      min-width: 0;
+    }
+
+    .switch {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .switch-slider {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid var(--border);
+      transition: background .2s ease, border-color .2s ease;
+    }
+
+    .switch-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 4px;
+      top: 3px;
+      border-radius: 50%;
+      background: var(--white);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      transition: transform .2s ease, background .2s ease;
+    }
+
+    .switch input:checked + .switch-slider {
+      background: rgba(255, 255, 255, 0.94);
+      border-color: var(--white);
+    }
+
+    .switch input:checked + .switch-slider::before {
+      transform: translateX(18px);
+      background: #080808;
+    }
+
+    .switch input:focus-visible + .switch-slider {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.10);
+    }
+
+    .toggle-status {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      min-width: 72px;
+      text-align: right;
+    }
+
+    .toggle-row.is-on .toggle-status {
+      color: var(--text-main);
+    }
+
+    .controls-action {
+      margin-top: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .controls-action .btn {
+      align-self: stretch;
+    }
+
+    .card-footer-notes {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .card-footer-notes .inline-date-error {
+      margin-top: 0;
+    }
+
+    .controls-action .btn {
+      height: 36px;
+      min-height: 36px;
     }
 
     .suspicious-panel {
@@ -1014,7 +1284,7 @@
     </div>
     <div class="container">
       <div class="input-section">
-        <div class="card">
+        <div class="card card-expand">
           <h2>Fonte do Report</h2>
           <p>Escolha o tipo de entrada. Para planilha, o período segue padrão Kibana: início inclusivo e fim exclusivo.</p>
 
@@ -1077,20 +1347,36 @@
           <div class="form-group">
             <input type="text" id="script-id" placeholder="Ex: 100424" />
           </div>
-          <div class="check-row">
-            <input type="checkbox" id="suspicious-traffic" />
-            <label for="suspicious-traffic">Suspeita de tráfego não confiável</label>
+          <div class="toggle-stack">
+            <div class="toggle-row ai-toggle-row" id="ai-toggle-row">
+              <label for="ai-analysis-toggle">Análise com IA</label>
+              <span class="toggle-status" id="ai-analysis-status">Desativado</span>
+              <label class="switch" aria-label="Análise com IA">
+                <input type="checkbox" id="ai-analysis-toggle" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row" id="suspicious-toggle-row">
+              <label for="suspicious-traffic">Análise de Tráfego Suspeito</label>
+              <span class="toggle-status" id="suspicious-traffic-status">Desativado</span>
+              <label class="switch" aria-label="Análise de Tráfego Suspeito">
+                <input type="checkbox" id="suspicious-traffic" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="controls-action">
+              <button class="btn" id="btn-analyze">
+                <span class="btn-label">Analisar Dados</span>
+                <span class="btn-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <button class="btn" id="btn-analyze">
-          <span class="btn-label">Analisar Dados</span>
-          <span class="btn-spinner" aria-hidden="true"></span>
-        </button>
-
-        <div class="inline-date-error" id="date-error-msg"></div>
-
-        <div class="error-message" id="error-msg"></div>
+        <div class="card-footer-notes">
+          <div class="inline-date-error" id="date-error-msg"></div>
+          <div class="error-message" id="error-msg"></div>
+        </div>
       </div>
 
       <div class="results-pane">
@@ -1227,7 +1513,10 @@
         </div>
 
         <div class="explanation">
-          <h3>Análise da IA</h3>
+          <div class="explanation-head">
+            <h3>Análise da IA</h3>
+            <div class="status-badge ai-status-badge status-alert" id="ai-analysis-badge">Desativado</div>
+          </div>
           <div class="explanation-text" id="res-explanation">—</div>
         </div>
 
@@ -1370,6 +1659,28 @@
       return `${sign}${num.toLocaleString('en-US')}`;
     }
 
+    function isAiAnalysisEnabled() {
+      return document.getElementById('ai-analysis-toggle').checked;
+    }
+
+    let lastRequestedAiAnalysis = false;
+
+    function setToggleRowState(rowId, statusId, enabled) {
+      const row = document.getElementById(rowId);
+      const status = document.getElementById(statusId);
+      row.classList.toggle('is-on', enabled);
+      status.textContent = enabled ? 'Ativo' : 'Desativado';
+    }
+
+    function syncAiToggleState() {
+      setToggleRowState('ai-toggle-row', 'ai-analysis-status', isAiAnalysisEnabled());
+    }
+
+    function syncSuspiciousToggleState() {
+      const enabled = document.getElementById('suspicious-traffic').checked;
+      setToggleRowState('suspicious-toggle-row', 'suspicious-traffic-status', enabled);
+    }
+
     function formatDateBRShort(value) {
       if (!value) return '—';
       const raw = String(value).split('T')[0];
@@ -1417,6 +1728,43 @@
         filePanel.classList.add('hidden');
         textPanel.classList.remove('hidden');
       }
+
+      syncResultsPanelHeight();
+    }
+
+    let resultsPanelObserver = null;
+
+    function syncResultsPanelHeight() {
+      const resultsPane = document.querySelector('.results-pane');
+      const firstCard = document.querySelector('.input-section > .card:nth-of-type(1)');
+      const secondCard = document.querySelector('.input-section > .card:nth-of-type(2)');
+      if (!resultsPane || !firstCard || !secondCard) return;
+
+      if (window.innerWidth <= 1080) {
+        resultsPane.style.height = 'auto';
+        return;
+      }
+
+      const firstRect = firstCard.getBoundingClientRect();
+      const secondRect = secondCard.getBoundingClientRect();
+      const height = Math.round(secondRect.bottom - firstRect.top);
+      resultsPane.style.height = `${height}px`;
+    }
+
+    function initResultsPanelHeightSync() {
+      syncResultsPanelHeight();
+
+      if (resultsPanelObserver) {
+        resultsPanelObserver.disconnect();
+      }
+
+      const firstCard = document.querySelector('.input-section > .card:nth-of-type(1)');
+      const secondCard = document.querySelector('.input-section > .card:nth-of-type(2)');
+      if ((!firstCard || !secondCard) || typeof ResizeObserver !== 'function') return;
+
+      resultsPanelObserver = new ResizeObserver(() => syncResultsPanelHeight());
+      resultsPanelObserver.observe(firstCard);
+      resultsPanelObserver.observe(secondCard);
     }
 
     function toIsoDate(d) {
@@ -1647,6 +1995,10 @@
       const endDate = formatDateBRShort(data.end_date);
       document.getElementById('res-period').textContent = `${startDate} a ${endDate}`;
 
+      const aiBadge = document.getElementById('ai-analysis-badge');
+      aiBadge.textContent = lastRequestedAiAnalysis ? 'Ativo' : 'Desativado';
+      aiBadge.className = 'status-badge ai-status-badge ' + (lastRequestedAiAnalysis ? 'status-normal' : 'status-alert');
+
       setStatus(data.status);
 
       // Table
@@ -1704,6 +2056,8 @@
       const textEndDate = document.getElementById('text-end-date').value;
       const scriptId = document.getElementById('script-id').value.trim();
       const suspiciousTraffic = document.getElementById('suspicious-traffic').checked;
+      const aiAnalysis = isAiAnalysisEnabled();
+      lastRequestedAiAnalysis = aiAnalysis;
       const isFileMode = document.getElementById('mode-file').classList.contains('active');
       hideDateError();
 
@@ -1761,6 +2115,7 @@
           formData.append('end_date', analysisEndDate);
           formData.append('script_id', scriptId);
           formData.append('suspicious_traffic', suspiciousTraffic ? 'true' : 'false');
+          formData.append('ai_analysis', aiAnalysis ? 'true' : 'false');
 
           response = await fetch(`${API_BASE}/analyze-file-job`, {
             method: 'POST',
@@ -1797,6 +2152,7 @@
               end_date: textEndDate || null,
               script_id: scriptId,
               suspicious_traffic: suspiciousTraffic,
+              ai_analysis: aiAnalysis,
             }),
           });
 
@@ -1812,6 +2168,7 @@
                 end_date: textEndDate || null,
                 script_id: scriptId,
                 suspicious_traffic: suspiciousTraffic,
+                ai_analysis: aiAnalysis,
               }),
             });
             data = await response.json();
@@ -1861,7 +2218,15 @@
 
     // Default mode
     setInputMode('text');
+    document.getElementById('ai-analysis-toggle').checked = false;
+    document.getElementById('suspicious-traffic').checked = false;
+    syncAiToggleState();
+    syncSuspiciousToggleState();
     initDatePickers();
+    initResultsPanelHeightSync();
+    document.getElementById('ai-analysis-toggle').addEventListener('change', syncAiToggleState);
+    document.getElementById('suspicious-traffic').addEventListener('change', syncSuspiciousToggleState);
+    window.addEventListener('resize', syncResultsPanelHeight);
     // Ctrl+Enter para submeter
     document.getElementById('report-text').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

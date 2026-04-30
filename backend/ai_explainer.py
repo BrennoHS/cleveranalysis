@@ -9,20 +9,13 @@ from analysis import DiscrepancyResult
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 EXPLAINER_MODEL = os.environ.get("GEMINI_EXPLAINER_MODEL", "gemini-flash-lite-latest")
 EXPLAINER_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_EXPLAINER_MAX_OUTPUT_TOKENS", "600"))
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-EXPLAINER_ENABLED = _env_bool("GEMINI_EXPLAINER_ENABLED", True)
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
 
 
 EXPLANATION_PROMPT = """
@@ -63,6 +56,7 @@ def _deterministic_fallback_explanation(
     end_date: str,
     publisher: str,
     suspicious_analysis: dict | None = None,
+    ai_analysis_enabled: bool = False,
 ) -> str:
     """Local Portuguese fallback used when Gemini quota/rate limits are reached."""
     pub_view_pct = result.pub_viewability * 100
@@ -70,7 +64,7 @@ def _deterministic_fallback_explanation(
     view_pp = result.viewability_diff_pp
     view_pp_sign = "+" if view_pp >= 0 else ""
 
-    mode_label = "modo IA desativada" if not EXPLAINER_ENABLED else "modo contingência"
+    mode_label = "modo IA desativada" if not ai_analysis_enabled else "modo contingência"
     explanation = (
         f"Resumo automático ({mode_label}): no período de {start_date} a {end_date}, "
         f"o publisher {publisher or 'não especificado'} reportou {result.pub_served:,} served e "
@@ -118,13 +112,21 @@ def generate_explanation(
     end_date: str,
     publisher: str,
     suspicious_analysis: dict | None = None,
+    ai_analysis_enabled: bool = False,
 ) -> str:
     """
     Calls Gemini to generate a professional explanation of the discrepancy.
     Returns a plain text explanation string.
     """
-    if not EXPLAINER_ENABLED:
-        return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
+    if not ai_analysis_enabled or not GEMINI_AVAILABLE:
+        return _deterministic_fallback_explanation(
+            result,
+            start_date,
+            end_date,
+            publisher,
+            suspicious_analysis=suspicious_analysis,
+            ai_analysis_enabled=ai_analysis_enabled,
+        )
 
     model = genai.GenerativeModel(EXPLAINER_MODEL)
 
@@ -203,11 +205,32 @@ def generate_explanation(
         text = (response.text or "").strip()
     except Exception as exc:
         if _is_quota_or_rate_limit_error(exc):
-            return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
-        fallback = _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
+            return _deterministic_fallback_explanation(
+                result,
+                start_date,
+                end_date,
+                publisher,
+                suspicious_analysis=suspicious_analysis,
+                ai_analysis_enabled=ai_analysis_enabled,
+            )
+        fallback = _deterministic_fallback_explanation(
+            result,
+            start_date,
+            end_date,
+            publisher,
+            suspicious_analysis=suspicious_analysis,
+            ai_analysis_enabled=ai_analysis_enabled,
+        )
         return "Serviço de IA temporariamente indisponível. Segue análise automática de contingência:\n\n" + fallback
 
     if not text:
-        return _deterministic_fallback_explanation(result, start_date, end_date, publisher, suspicious_analysis=suspicious_analysis)
+        return _deterministic_fallback_explanation(
+            result,
+            start_date,
+            end_date,
+            publisher,
+            suspicious_analysis=suspicious_analysis,
+            ai_analysis_enabled=ai_analysis_enabled,
+        )
 
     return text
